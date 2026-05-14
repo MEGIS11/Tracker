@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes objectifs</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#1a1a1a;padding:1.2rem;max-width:900px;margin:0 auto}
+.top-bar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.5rem}
+h2{font-size:20px;font-weight:600}
+.sub{font-size:13px;color:#888;margin-top:2px}
+.global{text-align:right}
+.global .big{font-size:30px;font-weight:600}
+.global .lbl{font-size:11px;color:#888}
+.sec{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin:1.5rem 0 .75rem;display:flex;align-items:center;gap:8px}
+.badge{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600}
+.bh{background:#dbeafe;color:#1d4ed8}
+.bp{background:#dcfce7;color:#15803d}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:14px 16px}
+.ct{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.cl{display:flex;align-items:center;gap:10px}
+.em{font-size:18px}
+.ttl{font-size:13px;font-weight:600}
+.csub{font-size:11px;color:#888;margin-top:2px}
+.cpct{font-size:22px;font-weight:600}
+.bar{height:5px;background:#f0f0ee;border-radius:99px;margin:6px 0 8px}
+.fill{height:5px;border-radius:99px;transition:width .4s ease}
+.dots{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.dot{width:9px;height:9px;border-radius:50%;background:#e5e5e3}
+.dot.miss{background:#fca5a5}
+.slbl{font-size:11px;font-weight:600;margin-left:6px}
+.form-section{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:1.25rem;margin-top:1.5rem}
+.form-section h3{font-size:15px;font-weight:600;margin-bottom:1rem}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.field label{font-size:12px;color:#555;display:block;margin-bottom:3px}
+.field input{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;-webkit-appearance:none}
+.field input:focus{border-color:#888}
+.hint{font-size:11px;color:#aaa;margin-top:3px}
+.brow{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap}
+.btn{padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #ddd;background:#fff;font-weight:500}
+.btnp{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btng{color:#aaa}
+.save-info{margin-top:1rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:12px;color:#15803d;display:none}
+.save-info.show{display:block}
+.logsec{margin-top:1.5rem}
+.logt{font-size:12px;font-weight:600;color:#888;margin-bottom:8px}
+.loge{font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f0f0ee}
+.loge:last-child{border-bottom:none}
+.logd{color:#aaa;margin-right:6px}
+.url-box{margin-top:1rem;background:#f8f8f6;border:1px solid #e5e5e3;border-radius:8px;padding:10px 14px;display:none}
+.url-box.show{display:block}
+.url-label{font-size:11px;color:#888;margin-bottom:6px;font-weight:600}
+.url-text{font-size:11px;color:#1a1a1a;word-break:break-all;line-height:1.5}
+.copy-btn{margin-top:8px;font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div><h2>Mes objectifs</h2><div class="sub" id="today"></div></div>
+  <div class="global"><div class="big" id="gpct">0%</div><div class="lbl">score global</div></div>
+</div>
+
+<div class="sec">Habitudes quotidiennes <span class="badge bh">streak / 30 jours</span></div>
+<div class="grid" id="gh"></div>
+
+<div class="sec">Progressions long terme <span class="badge bp">progression linéaire</span></div>
+<div class="grid" id="gp"></div>
+
+<div class="form-section">
+  <h3>Mise à jour du soir</h3>
+  <div class="fgrid" id="fg"></div>
+  <div class="brow">
+    <button class="btn btnp" onclick="saveDay()">Enregistrer la journée ✓</button>
+    <button class="btn btng" onclick="resetAll()">Réinitialiser</button>
+  </div>
+  <div class="save-info" id="save-info">
+    ✅ Journée enregistrée ! Copie le lien ci-dessous et ajoute-le en favori pour retrouver tes données.
+  </div>
+  <div class="url-box" id="url-box">
+    <div class="url-label">🔗 TON LIEN SAUVEGARDÉ — mets-le en favori !</div>
+    <div class="url-text" id="url-text"></div>
+    <button class="copy-btn" onclick="copyUrl()">Copier le lien</button>
+  </div>
+</div>
+
+<div class="logsec">
+  <div class="logt">Historique récent</div>
+  <div id="log"></div>
+</div>
+
+<script>
+const D=30;
+const H=[
+  {id:"scroll",e:"📵",t:"Moins de scroll",goal:25,start:120,hib:false,lbl:"Minutes de scroll aujourd'hui",hint:"Objectif : max 25 min/jour",c:"#b45309"},
+  {id:"sommeil",e:"😴",t:"Coucher plus tôt",goal:22.33,start:23.5,hib:false,lbl:"Heure de coucher (23.5 = 23h30)",hint:"Objectif : 22h20 ou avant",c:"#1d4ed8"},
+  {id:"bac",e:"📚",t:"Révisions bac",goal:60,start:0,hib:true,lbl:"Minutes de révision aujourd'hui",hint:"Objectif : 60 min/jour",c:"#15803d"},
+  {id:"culture",e:"🌍",t:"Culture générale",goal:30,start:5,hib:true,lbl:"Minutes d'apprentissage aujourd'hui",hint:"Objectif : 30 min/jour",c:"#be185d"},
+  {id:"porno",e:"🚫",t:"Arrêt pornographie",goal:0,start:1,hib:false,lbl:"Pornographie aujourd'hui (0=parfait, 1=rechute)",hint:"Objectif : 0 chaque jour",c:"#dc2626"},
+  {id:"masturb",e:"🧘",t:"Maîtrise de soi",goal:0,start:1,hib:false,lbl:"Masturbation aujourd'hui (0 ou 1)",hint:"Objectif : maîtrise progressive",c:"#7c3aed"},
+  {id:"esprit",e:"🌱",t:"Relation avec moi-même",goal:10,start:3,hib:true,lbl:"Ressenti du jour (1 à 10)",hint:"Maîtrise, calme, alignement intérieur",c:"#0f766e"},
+  {id:"xp",e:"🇯🇵",t:"Duolingo XP",goal:1000,start:0,hib:true,lbl:"XP Duolingo aujourd'hui",hint:"Objectif : 1000 XP/jour",c:"#c2410c"},
+  {id:"eau",e:"💧",t:"Hydratation",goal:8,start:0,hib:true,lbl:"Verres d'eau aujourd'hui",hint:"Objectif : 8 verres/jour",c:"#0284c7"},
+];
+const P=[
+  {id:"poids",e:"💪",t:"Prise de masse",u:"kg",goal:80,start:74,cur:74,lbl:"Poids aujourd'hui (kg)",hint:"Objectif : 80 kg",c:"#0f766e"},
+  {id:"japonais",e:"🎌",t:"Niveau Duolingo",u:"niv.",goal:50,start:26,cur:26,lbl:"Niveau Duolingo actuel",hint:"Niveau 50 avant le 11 juil.",c:"#c2410c"},
+];
+
+function loadState(){
+  try{
+    const hash=window.location.hash.slice(1);
+    if(hash){const d=JSON.parse(decodeURIComponent(atob(hash)));return d;}
+  }catch(e){}
+  return {h:{},p:{},log:[]};
+}
+
+function getUrl(s){
+  const encoded=btoa(encodeURIComponent(JSON.stringify(s)));
+  return window.location.href.split('#')[0]+'#'+encoded;
+}
+
+let st=loadState();
+
+function pts(h,v){
+  const ppt=100/D;
+  if(h.hib){if(v>=h.goal)return ppt;if(v<=0)return 0;return(v/h.goal)*ppt;}
+  else{if(v<=h.goal)return ppt;if(v>=h.start)return 0;return((h.start-v)/h.start)*ppt;}
+}
+function hpct(id){const d=st.h[id]||[];let t=0;d.forEach(x=>{if(x.p!=null)t+=x.p;});return Math.min(100,Math.round(t*10)/10);}
+function streak(id){const d=[...(st.h[id]||[])].reverse();const thr=(100/D)*0.8;let s=0;for(const x of d){if(x.p!=null&&x.p>=thr)s++;else break;}return s;}
+function ppct(p){const v=st.p[p.id]!==undefined?st.p[p.id]:p.cur;return Math.min(100,Math.max(0,Math.round(((v-p.start)/(p.goal-p.start))*100)));}
+
+function mkH(h){
+  const pct=hpct(h.id),s=streak(h.id);
+  const days=(st.h[h.id]||[]).slice(-10);
+  const thr=(100/D)*0.8;
+  const dothtml=days.map(d=>{if(d.p==null)return'<div class="dot"></div>';if(d.p>=thr)return`<div class="dot ok" style="background:${h.c}"></div>`;return'<div class="dot miss"></div>';}).join("");
+  const slbl=s>0?`<span class="slbl" style="color:${h.c}">${s}j 🔥</span>`:"";
+  const el=document.createElement("div");el.className="card";
+  el.innerHTML=`<div class="ct"><div class="cl"><span class="em">${h.e}</span><div><div class="ttl">${h.t}${slbl}</div><div class="csub">Jour ${Math.min((st.h[h.id]||[]).length,D)}/${D}</div></div></div><div class="cpct" style="color:${h.c}">${pct}%</div></div><div class="bar"><div class="fill" style="width:${pct}%;background:${h.c}"></div></div><div class="dots">${dothtml}</div>`;
+  return el;
+}
+
+function mkP(p){
+  const pct=ppct(p),v=st.p[p.id]!==undefined?st.p[p.id]:p.cur;
+  const el=document.createElement("div");el.className="card";
+  el.innerHTML=`<div class="ct"><div class="cl"><span class="em">${p.e}</span><div><div class="ttl">${p.t}</div><div class="csub">${v} ${p.u} → objectif ${p.goal} ${p.u}</div></div></div><div class="cpct" style="color:${p.c}">${pct}%</div></div><div class="bar"><div class="fill" style="width:${pct}%;background:${p.c}"></div></div>`;
+  return el;
+}
+
+function renderAll(){
+  const gh=document.getElementById("gh"),gp=document.getElementById("gp");
+  gh.innerHTML="";gp.innerHTML="";
+  let tot=0,cnt=0;
+  H.forEach(h=>{gh.appendChild(mkH(h));tot+=hpct(h.id);cnt++;});
+  P.forEach(p=>{gp.appendChild(mkP(p));tot+=ppct(p);cnt++;});
+  document.getElementById("gpct").textContent=Math.round(tot/cnt)+"%";
+}
+
+function renderForm(){
+  const fg=document.getElementById("fg");fg.innerHTML="";
+  H.forEach(h=>{
+    const days=st.h[h.id]||[],last=days.length>0?days[days.length-1].val:"";
+    const d=document.createElement("div");d.className="field";
+    d.innerHTML=`<label>${h.e} ${h.lbl}</label><input type="number" step="0.1" id="inp_${h.id}" placeholder="${last}"><div class="hint">${h.hint}</div>`;
+    fg.appendChild(d);
+  });
+  P.forEach(p=>{
+    const v=st.p[p.id]!==undefined?st.p[p.id]:p.cur;
+    const d=document.createElement("div");d.className="field";
+    d.innerHTML=`<label>${p.e} ${p.lbl}</label><input type="number" step="0.1" id="inp_${p.id}" placeholder="${v}"><div class="hint">${p.hint}</div>`;
+    fg.appendChild(d);
+  });
+}
+
+function renderLog(){
+  const el=document.getElementById("log");
+  if(!st.log||!st.log.length){el.innerHTML='<div class="loge" style="color:#bbb">Aucune entrée pour l\'instant — à ce soir !</div>';return;}
+  el.innerHTML=st.log.slice().reverse().slice(0,7).map(e=>`<div class="loge"><span class="logd">${e.date}</span>${e.summary}</div>`).join("");
+}
+
+function saveDay(){
+  const today=new Date().toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});
+  const changes=[];
+  H.forEach(h=>{
+    const inp=document.getElementById("inp_"+h.id);
+    if(inp&&inp.value!==""){
+      const v=parseFloat(inp.value);
+      if(!isNaN(v)){
+        if(!st.h[h.id])st.h[h.id]=[];
+        const p=pts(h,v);
+        st.h[h.id].push({date:today,val:v,p});
+        if(st.h[h.id].length>D)st.h[h.id].shift();
+        changes.push(h.e+" "+h.t+" → "+hpct(h.id)+"%");
+        inp.value="";
+      }
+    }
+  });
+  P.forEach(p=>{
+    const inp=document.getElementById("inp_"+p.id);
+    if(inp&&inp.value!==""){
+      const v=parseFloat(inp.value);
+      if(!isNaN(v)){st.p[p.id]=v;changes.push(p.e+" "+p.t+" → "+ppct(p)+"%");inp.value="";}
+    }
+  });
+  if(changes.length){if(!st.log)st.log=[];st.log.push({date:today,summary:changes.join(" | ")});}
+  
+  const newUrl=getUrl(st);
+  window.location.hash=newUrl.split('#')[1];
+  
+  document.getElementById("save-info").classList.add("show");
+  const urlBox=document.getElementById("url-box");
+  urlBox.classList.add("show");
+  document.getElementById("url-text").textContent=newUrl;
+  
+  renderAll();
+  renderLog();
+}
+
+function copyUrl(){
+  const url=document.getElementById("url-text").textContent;
+  navigator.clipboard.writeText(url).then(()=>{
+    document.querySelector(".copy-btn").textContent="✓ Copié !";
+    setTimeout(()=>{document.querySelector(".copy-btn").textContent="Copier le lien";},2000);
+  }).catch(()=>{
+    const el=document.getElementById("url-text");
+    const range=document.createRange();
+    range.selectNode(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+}
+
+function resetAll(){
+  if(confirm("Réinitialiser tout le tracker ?")){
+    st={h:{},p:{},log:[]};
+    window.location.hash="";
+    renderAll();
+    renderForm();
+    renderLog();
+    document.getElementById("save-info").classList.remove("show");
+    document.getElementById("url-box").classList.remove("show");
+  }
+}
+
+document.getElementById("today").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+renderAll();
+renderForm();
+renderLog();
+</script>
+</body>
+</html>
