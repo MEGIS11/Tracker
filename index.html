@@ -245,38 +245,112 @@ const ImpactPill=({cat,val})=>{
   </div>;
 };
 
-// ── AI ACTIVITY ANALYSIS ──
-async function analyzeActivity(text){
-  const prompt=`Tu es un assistant qui analyse les activités d'un jeune homme de 18 ans et leur impact sur 5 catégories de vie: corps, nutrition, cerveau, apparence, discipline.
+// ── LOCAL ACTIVITY ANALYSIS (keyword + duration) ──
+function analyzeActivity(text){
+  return new Promise(resolve=>{
+    const t=text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 
-Activité décrite: "${text}"
+    // Extract duration in minutes
+    let mins=0;
+    const hMatch=t.match(/(\d+[\.,]?\d*)\s*h/);
+    const mMatch=t.match(/(\d+[\.,]?\d*)\s*min/);
+    const secMatch=t.match(/(\d+[\.,]?\d*)\s*sec/);
+    if(hMatch) mins+=parseFloat(hMatch[1].replace(",","."))*60;
+    if(mMatch) mins+=parseFloat(mMatch[1].replace(",","."));
+    if(secMatch) mins+=parseFloat(secMatch[1].replace(",","."))/60;
+    if(mins===0) mins=30; // default if no duration
 
-Retourne UNIQUEMENT un objet JSON valide (sans markdown, sans backticks) avec exactement ces 5 clés et des valeurs entières entre -20 et +20 (0 si pas d'impact):
-{"corps":0,"nutrition":0,"cerveau":0,"apparence":0,"discipline":0}
+    // Duration multiplier: base is 30min
+    const mul=Math.min(mins/30, 6); // cap at 6x (3h)
 
-Exemples:
-- "joué aux échecs 1h" → {"corps":0,"nutrition":0,"cerveau":8,"apparence":0,"discipline":5}
-- "scrollé TikTok 2h" → {"corps":-3,"nutrition":0,"cerveau":-5,"apparence":0,"discipline":-8}
-- "fait 50 pompes" → {"corps":10,"nutrition":0,"cerveau":0,"apparence":2,"discipline":7}
-- "mangé une pizza" → {"corps":-3,"nutrition":-6,"cerveau":0,"apparence":-2,"discipline":-3}
-- "lu un livre 1h" → {"corps":0,"nutrition":0,"cerveau":9,"apparence":0,"discipline":6}
-- "médité 15 min" → {"corps":2,"nutrition":0,"cerveau":5,"apparence":0,"discipline":8}
+    // Activity database: {keywords[], impacts per 30min}
+    const DB=[
+      // === SPORT & CORPS ===
+      {k:["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche"],i:{corps:12,nutrition:0,cerveau:1,apparence:3,discipline:8}},
+      {k:["course","courir","jogging","sprint","cardio","run"],i:{corps:11,nutrition:0,cerveau:2,apparence:2,discipline:7}},
+      {k:["foot","football","futsal","match"],i:{corps:10,nutrition:0,cerveau:3,apparence:1,discipline:6}},
+      {k:["basket","basketball","tennis","badminton","sport","ping","pong","natation","nager","velo","cyclisme","boxe","mma","judo","karate","sport"],i:{corps:9,nutrition:0,cerveau:2,apparence:1,discipline:6}},
+      {k:["marche","marcher","balade","balader","promenade","promener"],i:{corps:5,nutrition:0,cerveau:3,apparence:0,discipline:3}},
+      {k:["randonnee","randonner","foret","montagne","nature","hiking"],i:{corps:7,nutrition:0,cerveau:5,apparence:0,discipline:4}},
+      {k:["etirement","etirer","stretching","yoga","souplesse","mobilite"],i:{corps:5,nutrition:0,cerveau:2,apparence:1,discipline:5}},
+      {k:["sieste","dormi","dors","sommeil"],i:{corps:4,nutrition:0,cerveau:3,apparence:2,discipline:-1}},
+      {k:["danse","danser"],i:{corps:8,nutrition:0,cerveau:2,apparence:3,discipline:4}},
 
-Sois précis et honnête sur les impacts négatifs. Réponds UNIQUEMENT avec le JSON.`;
+      // === NUTRITION ===
+      {k:["cuisine","cuisiné","prépare","repas","fait a manger","cook"],i:{corps:2,nutrition:8,cerveau:3,apparence:1,discipline:6}},
+      {k:["legume","legumes","salade","brocoli","carotte","epinard","courgette","tomate","concombre","poivron"],i:{corps:2,nutrition:10,cerveau:0,apparence:3,discipline:3}},
+      {k:["fruit","pomme","banane","orange","fraise","myrtille","mangue","kiwi","raisin"],i:{corps:2,nutrition:9,cerveau:0,apparence:3,discipline:2}},
+      {k:["proteine","poulet","dinde","boeuf","poisson","saumon","thon","oeuf","fromage blanc","yaourt","shake"],i:{corps:3,nutrition:9,cerveau:0,apparence:2,discipline:3}},
+      {k:["pizza","burger","fast food","mcdo","kebab","frite","chips","nuggets"],i:{corps:-4,nutrition:-8,cerveau:0,apparence:-3,discipline:-5}},
+      {k:["sucre","bonbon","gateau","chocolat","glace","dessert","viennoiserie"],i:{corps:-2,nutrition:-6,cerveau:0,apparence:-2,discipline:-4}},
+      {k:["alcool","biere","vin","cocktail","boire"],i:{corps:-5,nutrition:-7,cerveau:-4,apparence:-3,discipline:-6}},
+      {k:["eau","hydrat"],i:{corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2}},
 
-  const resp=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-6",
-      max_tokens:150,
-      messages:[{role:"user",content:prompt}]
-    })
+      // === CERVEAU ===
+      {k:["livre","lire","lu","lecture","roman","bouquin"],i:{corps:0,nutrition:0,cerveau:10,apparence:0,discipline:6}},
+      {k:["echecs","chess","jeu de reflexion","sudoku","puzzle","enigme"],i:{corps:0,nutrition:0,cerveau:10,cerveau:10,apparence:0,discipline:6}},
+      {k:["japonais","kanji","hiragana","katakana","duolingo","langue","apprendre"],i:{corps:0,nutrition:0,cerveau:11,apparence:0,discipline:7}},
+      {k:["documentaire","docu","reportage"],i:{corps:0,nutrition:0,cerveau:8,apparence:0,discipline:3}},
+      {k:["podcast","conference","ted","cours en ligne","mooc","formation"],i:{corps:0,nutrition:0,cerveau:8,apparence:0,discipline:5}},
+      {k:["dessin","dessiner","sketch","croquis","illustrer","illustré","aquarelle","peinture","peindre"],i:{corps:0,nutrition:0,cerveau:7,apparence:2,discipline:5}},
+      {k:["coder","programmer","code","dev","développer","javascript","python","html"],i:{corps:0,nutrition:0,cerveau:11,apparence:0,discipline:7}},
+      {k:["ecrire","rediger","journal","blog","dissertation"],i:{corps:0,nutrition:0,cerveau:8,apparence:0,discipline:5}},
+      {k:["music","musique","guitare","piano","instrument","jouer de"],i:{corps:0,nutrition:0,cerveau:7,apparence:1,discipline:6}},
+      {k:["meditation","mediter","pleine conscience","mindfulness","respiration"],i:{corps:2,nutrition:0,cerveau:7,apparence:0,discipline:8}},
+      {k:["prier","priere","spirituel"],i:{corps:0,nutrition:0,cerveau:4,apparence:0,discipline:5}},
+      {k:["géographie","histoire","science","biologie","physique","chimie","maths","revise","révision"],i:{corps:0,nutrition:0,cerveau:9,apparence:0,discipline:7}},
+
+      // === APPARENCE / STYLE ===
+      {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{corps:0,nutrition:0,cerveau:1,apparence:7,discipline:2}},
+      {k:["coiffeur","coupe","cheveux"],i:{corps:0,nutrition:0,cerveau:0,apparence:8,discipline:2}},
+      {k:["soin","skincare","creme","masque visage","nettoyant"],i:{corps:1,nutrition:0,cerveau:0,apparence:9,discipline:4}},
+      {k:["rasage","raser","rasé"],i:{corps:0,nutrition:0,cerveau:0,apparence:6,discipline:3}},
+      {k:["parfum","cologne"],i:{corps:0,nutrition:0,cerveau:0,apparence:5,discipline:2}},
+      {k:["douche","bain","laver"],i:{corps:2,nutrition:0,cerveau:0,apparence:7,discipline:3}},
+
+      // === DISCIPLINE / PRODUCTIVITE ===
+      {k:["ranger","nettoyé","nettoyage","ménage","aspirateur","vaisselle","chambre"],i:{corps:1,nutrition:0,cerveau:1,apparence:2,discipline:7}},
+      {k:["planifier","planning","organisation","organiser","objectif","agenda","todo"],i:{corps:0,nutrition:0,cerveau:4,apparence:0,discipline:9}},
+      {k:["reveil","lever","debout","matin"],i:{corps:1,nutrition:0,cerveau:1,apparence:0,discipline:7}},
+      {k:["travail","bosser","boulot","stage","job"],i:{corps:0,nutrition:0,cerveau:5,apparence:0,discipline:8}},
+      {k:["famille","parent","frere","soeur","ami","sortie","social","parle","discute"],i:{corps:0,nutrition:0,cerveau:4,apparence:2,discipline:2}},
+      {k:["voyage","visite","musee","expo","culture","tourisme"],i:{corps:2,nutrition:0,cerveau:7,apparence:1,discipline:3}},
+
+      // === ACTIVITES NEGATIVES ===
+      {k:["scroll","scroller","instagram","tiktok","snapchat","twitter","x","reseaux","réseaux","feed","explore"],i:{corps:-2,nutrition:0,cerveau:-5,apparence:-1,discipline:-8}},
+      {k:["netflix","serie","film","youtube","video","watch","regardé","regarder"],i:{corps:-1,nutrition:0,cerveau:-2,apparence:0,discipline:-4}},
+      {k:["jeux video","jeux vidéo","gaming","gamer","ps5","xbox","pc","fortnite","fifa","cod","lol","valorant","minecraft"],i:{corps:-1,nutrition:0,cerveau:2,apparence:0,discipline:-5}},
+      {k:["fumer","cigarette","clope","tabac","weed","cannabis","joint"],i:{corps:-8,nutrition:-3,cerveau:-3,apparence:-4,discipline:-6}},
+      {k:["paresse","glander","glande","rien","trainé","trainer","procrastine","procrastination"],i:{corps:-3,nutrition:0,cerveau:-4,apparence:-1,discipline:-9}},
+      {k:["dormi trop","oversleep","grasse matinee","grasse matinée"],i:{corps:-1,nutrition:0,cerveau:-2,apparence:-1,discipline:-6}},
+    ];
+
+    // Find matching activity
+    let bestMatch=null, bestScore=0;
+    for(const entry of DB){
+      let score=0;
+      for(const kw of entry.k){
+        if(t.includes(kw)) score+=kw.length; // longer keyword = more specific = better match
+      }
+      if(score>bestScore){bestScore=score;bestMatch=entry;}
+    }
+
+    if(!bestMatch){
+      // Unknown activity — neutral with slight discipline bonus
+      resolve({corps:0,nutrition:0,cerveau:1,apparence:0,discipline:2});
+      return;
+    }
+
+    // Apply duration multiplier and round
+    const raw=bestMatch.i;
+    const result={};
+    for(const k of Object.keys(raw)){
+      const v=raw[k]*mul;
+      // Cap values
+      result[k]=Math.round(Math.max(-20,Math.min(20,v)));
+    }
+    resolve(result);
   });
-  const data=await resp.json();
-  const txt=data.content?.map(x=>x.text||"").join("")||"{}";
-  try{return JSON.parse(txt.trim());}
-  catch{return{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};}
 }
 
 // ── DASHBOARD ──
