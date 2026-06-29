@@ -1,218 +1,892 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mes objectifs</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Amaury's Quest"/>
+<title>Amaury's Quest</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#1a1a1a;padding:1.2rem;max-width:900px;margin:0 auto}
-.top-bar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.5rem}
-h2{font-size:20px;font-weight:600}
-.sub{font-size:13px;color:#888;margin-top:2px}
-.global{text-align:right}
-.global .big{font-size:30px;font-weight:600}
-.global .lbl{font-size:11px;color:#888}
-.sec{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#888;margin:1.5rem 0 .75rem;display:flex;align-items:center;gap:8px}
-.badge{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600}
-.bh{background:#dbeafe;color:#1d4ed8}
-.bp{background:#dcfce7;color:#15803d}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
-.card{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:14px 16px}
-.ct{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-.cl{display:flex;align-items:center;gap:10px}
-.em{font-size:18px}
-.ttl{font-size:13px;font-weight:600}
-.csub{font-size:11px;color:#888;margin-top:2px}
-.cpct{font-size:22px;font-weight:600}
-.bar{height:5px;background:#f0f0ee;border-radius:99px;margin:6px 0 8px}
-.fill{height:5px;border-radius:99px;transition:width .4s ease}
-.dots{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
-.dot{width:9px;height:9px;border-radius:50%;background:#e5e5e3}
-.dot.miss{background:#fca5a5}
-.slbl{font-size:11px;font-weight:600;margin-left:6px}
-.form-section{background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:1.25rem;margin-top:1.5rem}
-.form-section h3{font-size:15px;font-weight:600;margin-bottom:1rem}
-.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
-.field label{font-size:12px;color:#555;display:block;margin-bottom:3px}
-.field input{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;-webkit-appearance:none}
-.field input:focus{border-color:#888}
-.hint{font-size:11px;color:#aaa;margin-top:3px}
-.brow{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap}
-.btn{padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #ddd;background:#fff;font-weight:500}
-.btnp{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-.btng{color:#aaa}
-.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:99px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
-.toast.show{opacity:1}
-.logsec{margin-top:1.5rem}
-.logt{font-size:12px;font-weight:600;color:#888;margin-bottom:8px}
-.loge{font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f0f0ee}
-.loge:last-child{border-bottom:none}
-.logd{color:#aaa;margin-right:6px}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#080810;font-family:'Inter',system-ui,sans-serif;color:#eeeeff;overscroll-behavior:none;}
+input,textarea{outline:none;color:#eeeeff;font-family:inherit;}
+button{font-family:inherit;}
+button:active{opacity:.75;transform:scale(.97);}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:#2a2a45;border-radius:4px;}
+@keyframes pop{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+@keyframes shimmer{0%,100%{opacity:.7}50%{opacity:1}}
+@keyframes particle{to{transform:translate(var(--dx),var(--dy));opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef}=React;
 
-<div class="top-bar">
-  <div><h2>Mes objectifs</h2><div class="sub" id="today"></div></div>
-  <div class="global"><div class="big" id="gpct">0%</div><div class="lbl">score global</div></div>
-</div>
+const C={
+  bg:"#080810",surface:"#0f0f1c",card:"#13131f",border:"#1e1e35",muted:"#2a2a45",dim:"#30304a",
+  text:"#eeeeff",sub:"#6060a0",
+  purple:"#7c3aed",violet:"#a78bfa",lavender:"#c4b5fd",
+  green:"#10b981",emerald:"#34d399",
+  yellow:"#f59e0b",gold:"#fbbf24",
+  red:"#e11d48",rose:"#f43f5e",
+  blue:"#0ea5e9",sky:"#38bdf8",
+  orange:"#ea580c",amber:"#fb923c",
+  pink:"#db2777",fuchsia:"#f472b6",
+};
 
-<div class="sec">Habitudes quotidiennes <span class="badge bh">streak / 30 jours</span></div>
-<div class="grid" id="gh"></div>
+const SK="amaury-quest-v4";
+const TODAY=()=>new Date().toISOString().slice(0,10);
 
-<div class="sec">Progressions long terme <span class="badge bp">progression linéaire</span></div>
-<div class="grid" id="gp"></div>
-
-<div class="form-section">
-  <h3>Mise à jour du soir</h3>
-  <div class="fgrid" id="fg"></div>
-  <div class="brow">
-    <button class="btn btnp" onclick="saveDay()">Enregistrer la journée ✓</button>
-    <button class="btn btng" onclick="resetAll()">Réinitialiser</button>
-  </div>
-</div>
-
-<div class="logsec">
-  <div class="logt">Historique récent</div>
-  <div id="log"></div>
-</div>
-
-<div class="toast" id="toast">✅ Journée enregistrée !</div>
-
-<script>
-const D=30;
-const H=[
-  {id:"scroll",e:"📵",t:"Moins de scroll",goal:25,start:120,hib:false,lbl:"Minutes de scroll aujourd'hui",hint:"Objectif : max 25 min/jour",c:"#b45309"},
-  {id:"sommeil",e:"😴",t:"Coucher plus tôt",goal:22.33,start:23.5,hib:false,lbl:"Heure de coucher (23.5 = 23h30)",hint:"Objectif : 22h20 ou avant",c:"#1d4ed8"},
-  {id:"bac",e:"📚",t:"Révisions bac",goal:60,start:0,hib:true,lbl:"Minutes de révision aujourd'hui",hint:"Objectif : 60 min/jour",c:"#15803d"},
-  {id:"culture",e:"🌍",t:"Culture générale",goal:30,start:5,hib:true,lbl:"Minutes d'apprentissage aujourd'hui",hint:"Objectif : 30 min/jour",c:"#be185d"},
-  {id:"porno",e:"🚫",t:"Arrêt pornographie",goal:0,start:1,hib:false,lbl:"Pornographie aujourd'hui (0=parfait, 1=rechute)",hint:"Objectif : 0 chaque jour",c:"#dc2626"},
-  {id:"masturb",e:"🧘",t:"Maîtrise de soi",goal:0,start:1,hib:false,lbl:"Masturbation aujourd'hui (0 ou 1)",hint:"Objectif : maîtrise progressive",c:"#7c3aed"},
-  {id:"esprit",e:"🌱",t:"Relation avec moi-même",goal:10,start:3,hib:true,lbl:"Ressenti du jour (1 à 10)",hint:"Maîtrise, calme, alignement intérieur",c:"#0f766e"},
-  {id:"xp",e:"🇯🇵",t:"Duolingo XP",goal:1000,start:0,hib:true,lbl:"XP Duolingo aujourd'hui",hint:"Objectif : 1000 XP/jour",c:"#c2410c"},
-  {id:"eau",e:"💧",t:"Hydratation",goal:8,start:0,hib:true,lbl:"Verres d'eau aujourd'hui",hint:"Objectif : 8 verres/jour",c:"#0284c7"},
+const RANKS=[
+  {min:1,max:2,icon:"🥚",name:"L'Œuf Cosmique",color:"#94a3b8"},
+  {min:3,max:5,icon:"🌱",name:"Apprenti du Chaos",color:C.emerald},
+  {min:6,max:9,icon:"⚔️",name:"Écuyer des Temps Modernes",color:C.sky},
+  {min:10,max:14,icon:"🐺",name:"Loup Solitaire Discipliné",color:C.violet},
+  {min:15,max:19,icon:"🔥",name:"Guerrier de l'Aube",color:C.amber},
+  {min:20,max:29,icon:"🏯",name:"Samouraï du Quotidien",color:C.gold},
+  {min:30,max:39,icon:"🌊",name:"Maître des Flots Intérieurs",color:C.blue},
+  {min:40,max:49,icon:"⚡",name:"Titan Silencieux",color:C.rose},
+  {min:50,max:999,icon:"🌌",name:"Éveillé des Étoiles",color:"#e879f9"},
 ];
-const P=[
-  {id:"poids",e:"💪",t:"Prise de masse",u:"kg",goal:80,start:74,cur:74,lbl:"Poids aujourd'hui (kg)",hint:"Objectif : 80 kg",c:"#0f766e"},
-  {id:"japonais",e:"🎌",t:"Niveau Duolingo",u:"niv.",goal:50,start:26,cur:26,lbl:"Niveau Duolingo actuel",hint:"Niveau 50 avant le 11 juil.",c:"#c2410c"},
+const getRank=l=>RANKS.find(r=>l>=r.min&&l<=r.max)||RANKS[0];
+
+const BADGES=[
+  {id:"b_gym10",icon:"🏋️",name:"No Days Off",desc:"10 séances de gym consécutives",cat:"Corps",rarity:"rare"},
+  {id:"b_gym30",icon:"💪",name:"Bras de Titan",desc:"30 séances de gym au total",cat:"Corps",rarity:"epic"},
+  {id:"b_water7",icon:"💧",name:"Chameau Légendaire",desc:"7 jours d'hydratation parfaite",cat:"Corps",rarity:"rare"},
+  {id:"b_water30",icon:"🌊",name:"Fontaine Vivante",desc:"30 jours d'hydratation parfaite",cat:"Corps",rarity:"epic"},
+  {id:"b_sleep10",icon:"😴",name:"Hibernation Royale",desc:"10 nuits de sommeil parfait de suite",cat:"Corps",rarity:"rare"},
+  {id:"b_wakeup14",icon:"🌅",name:"L'Aurore m'appartient",desc:"14 levers avant 8h30 de suite",cat:"Corps",rarity:"epic"},
+  {id:"b_backflip",icon:"🤸",name:"Corps de Légende",desc:"Quête backflip terminée",cat:"Corps",rarity:"legendary"},
+  {id:"b_reading20",icon:"📚",name:"Bibliothèque Ambulante",desc:"20 jours de lecture consécutifs",cat:"Cerveau",rarity:"epic"},
+  {id:"b_japanese",icon:"🎌",name:"Fils de Miyazaki",desc:"Quête 100 mots japonais terminée",cat:"Cerveau",rarity:"epic"},
+  {id:"b_drawing",icon:"🎨",name:"Da Vinci du Dimanche",desc:"Carnet de 25 dessins terminé",cat:"Cerveau",rarity:"rare"},
+  {id:"b_onepiece30",icon:"🏴‍☠️",name:"Nakama Éternel",desc:"30 épisodes One Piece trackés",cat:"Cerveau",rarity:"rare"},
+  {id:"b_style",icon:"👔",name:"Séducteur Structuré",desc:"Style signature 5 tenues terminé",cat:"Style",rarity:"rare"},
+  {id:"b_grooming14",icon:"✨",name:"Gentleman Fantôme",desc:"14 jours de routine apparence parfaite",cat:"Style",rarity:"epic"},
+  {id:"b_cooking",icon:"🍳",name:"Gordon en Devenir",desc:"5 plats cuisinés de A à Z",cat:"Discipline",rarity:"rare"},
+  {id:"b_tidy10",icon:"🧹",name:"Moine Zen de l'IKEA",desc:"10 jours de rangement consécutifs",cat:"Discipline",rarity:"common"},
+  {id:"b_meditation",icon:"🧘",name:"Moine Urbain",desc:"7 jours de méditation consécutifs",cat:"Discipline",rarity:"rare"},
+  {id:"b_nocturne",icon:"🌙",name:"Noctambule Repenti",desc:"10 couchers avant minuit de suite",cat:"Discipline",rarity:"rare"},
+  {id:"b_protein14",icon:"🥩",name:"Carnivore Discipliné",desc:"14 jours d'objectif protéines atteint",cat:"Nutrition",rarity:"rare"},
+  {id:"b_protein30",icon:"💪",name:"Machine à Croître",desc:"30 jours d'objectif protéines atteint",cat:"Nutrition",rarity:"epic"},
+  {id:"b_veggie7",icon:"🥦",name:"Jardinier de l'Intérieur",desc:"7 jours de 5 fruits et légumes",cat:"Nutrition",rarity:"rare"},
+  {id:"b_veggie30",icon:"🌱",name:"Végétal Suprême",desc:"30 jours de fruits et légumes parfaits",cat:"Nutrition",rarity:"epic"},
+  {id:"b_perfect7",icon:"📅",name:"Machine",desc:"7 jours parfaits de suite",cat:"Légendaire",rarity:"epic"},
+  {id:"b_perfect30",icon:"🌌",name:"Le Mois Parfait",desc:"30 jours parfaits au total",cat:"Légendaire",rarity:"legendary"},
+  {id:"b_pure14",icon:"👁️",name:"Âme Pure",desc:"14 jours sans aucune dette conscience",cat:"Légendaire",rarity:"legendary"},
+  {id:"b_streak21",icon:"⚡",name:"Mode Berserk",desc:"21 jours de streak global",cat:"Légendaire",rarity:"legendary"},
+  {id:"b_conscience7",icon:"🙏",name:"Conscience Nette",desc:"7 jours sans dette conscience",cat:"Légendaire",rarity:"epic"},
+  {id:"b_japan",icon:"🇯🇵",name:"Samouraï de l'Été",desc:"Tous les badges avant le départ au Japon",cat:"Légendaire",rarity:"legendary"},
 ];
 
-const KEY="tracker_megis11_v1";
-function load(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):{h:{},p:{},log:[]};}catch(e){return{h:{},p:{},log:[]};}}
-function save(s){try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){}}
-let st=load();
+const RC={
+  common:{bg:"#1e293b",border:"#334155",text:"#94a3b8",glow:"none"},
+  rare:{bg:"#1e1b4b",border:"#4338ca",text:"#818cf8",glow:"0 0 12px rgba(99,102,241,0.4)"},
+  epic:{bg:"#2d1b69",border:"#7c3aed",text:"#a78bfa",glow:"0 0 16px rgba(124,58,237,0.5)"},
+  legendary:{bg:"#451a03",border:"#f59e0b",text:"#fbbf24",glow:"0 0 20px rgba(245,158,11,0.6)"},
+};
 
-function pts(h,v){
-  const ppt=100/D;
-  if(h.hib){if(v>=h.goal)return ppt;if(v<=0)return 0;return(v/h.goal)*ppt;}
-  else{if(v<=h.goal)return ppt;if(v>=h.start)return 0;return((h.start-v)/h.start)*ppt;}
-}
-function hpct(id){const d=st.h[id]||[];let t=0;d.forEach(x=>{if(x.p!=null)t+=x.p;});return Math.min(100,Math.round(t*10)/10);}
-function streak(id){const d=[...(st.h[id]||[])].reverse();const thr=(100/D)*0.8;let s=0;for(const x of d){if(x.p!=null&&x.p>=thr)s++;else break;}return s;}
-function ppct(p){const v=st.p[p.id]!==undefined?st.p[p.id]:p.cur;return Math.min(100,Math.max(0,Math.round(((v-p.start)/(p.goal-p.start))*100)));}
+const XPT=Array.from({length:100},(_,i)=>Math.floor(120*Math.pow(1.38,i)));
+const getLvl=xp=>{let l=1,r=xp;for(let i=0;i<XPT.length;i++){if(r>=XPT[i]){r-=XPT[i];l=i+2;}else break;}const n=XPT[l-1]||99999;return{lvl:l,rem:r,needed:n,pct:(r/n)*100};};
 
-function mkH(h){
-  const pct=hpct(h.id),s=streak(h.id);
-  const days=(st.h[h.id]||[]).slice(-10);
-  const thr=(100/D)*0.8;
-  const dothtml=days.map(d=>{if(d.p==null)return'<div class="dot"></div>';if(d.p>=thr)return`<div class="dot ok" style="background:${h.c}"></div>`;return'<div class="dot miss"></div>';}).join("");
-  const slbl=s>0?`<span class="slbl" style="color:${h.c}">${s}j 🔥</span>`:"";
-  const el=document.createElement("div");el.className="card";
-  el.innerHTML=`<div class="ct"><div class="cl"><span class="em">${h.e}</span><div><div class="ttl">${h.t}${slbl}</div><div class="csub">Jour ${Math.min((st.h[h.id]||[]).length,D)}/${D}</div></div></div><div class="cpct" style="color:${h.c}">${pct}%</div></div><div class="bar"><div class="fill" style="width:${pct}%;background:${h.c}"></div></div><div class="dots">${dothtml}</div>`;
-  return el;
-}
+const CORE=[
+  {id:"water",cat:"corps",icon:"💧",label:"Hydratation",unit:"ml",goal:2000,step:200,xp:30,color:C.sky},
+  {id:"gym",cat:"corps",icon:"🏋️",label:"Séance Gym",unit:"min",goal:90,step:15,xp:55,color:C.violet},
+  {id:"sleep",cat:"corps",icon:"😴",label:"Sommeil",unit:"h",goal:8.67,step:0,xp:35,color:C.purple},
+  {id:"protein",cat:"nutrition",icon:"🥩",label:"Protéines",unit:"g",goal:150,step:10,xp:40,color:C.amber},
+  {id:"veggies",cat:"nutrition",icon:"🥦",label:"Fruits & Légumes",unit:"port.",goal:5,step:1,xp:30,color:C.emerald},
+  {id:"japanese",cat:"cerveau",icon:"🎌",label:"Japonais",unit:"min",goal:60,step:10,xp:45,color:C.fuchsia},
+  {id:"reading",cat:"cerveau",icon:"📚",label:"Lecture",unit:"min",goal:30,step:10,xp:35,color:C.gold},
+  {id:"grooming",cat:"apparence",icon:"✨",label:"Routine apparence",unit:"check",goal:4,step:1,xp:30,color:C.amber,
+    checklist:["Rasage / visage","Skincare","Parfum","Tenue soignée"]},
+  {id:"wakeup",cat:"discipline",icon:"🌅",label:"Lever avant 8h30",unit:"bool",goal:1,step:1,xp:25,color:C.gold},
+  {id:"meditation",cat:"discipline",icon:"🧘",label:"Méditation",unit:"min",goal:10,step:5,xp:30,color:C.emerald},
+  {id:"onepiece",cat:"discipline",icon:"🏴‍☠️",label:"One Piece",unit:"ep",goal:2,step:1,xp:20,color:C.red},
+];
 
-function mkP(p){
-  const pct=ppct(p),v=st.p[p.id]!==undefined?st.p[p.id]:p.cur;
-  const el=document.createElement("div");el.className="card";
-  el.innerHTML=`<div class="ct"><div class="cl"><span class="em">${p.e}</span><div><div class="ttl">${p.t}</div><div class="csub">${v} ${p.u} → objectif ${p.goal} ${p.u}</div></div></div><div class="cpct" style="color:${p.c}">${pct}%</div></div><div class="bar"><div class="fill" style="width:${pct}%;background:${p.c}"></div></div>`;
-  return el;
-}
+const BONUS=[
+  {id:"stretching",cat:"corps",icon:"🤸",label:"Étirements",unit:"min",goal:15,step:5,xp:20,color:C.emerald},
+  {id:"drawing",cat:"cerveau",icon:"🎨",label:"Dessin",unit:"min",goal:20,step:5,xp:25,color:C.fuchsia},
+  {id:"tidy",cat:"discipline",icon:"🧹",label:"Ranger",unit:"bool",goal:1,step:1,xp:15,color:C.sub},
+  {id:"cooking",cat:"discipline",icon:"🍳",label:"Cuisiner",unit:"bool",goal:1,step:1,xp:35,color:C.amber},
+];
 
-function renderAll(){
-  const gh=document.getElementById("gh"),gp=document.getElementById("gp");
-  gh.innerHTML="";gp.innerHTML="";
-  let tot=0,cnt=0;
-  H.forEach(h=>{gh.appendChild(mkH(h));tot+=hpct(h.id);cnt++;});
-  P.forEach(p=>{gp.appendChild(mkP(p));tot+=ppct(p);cnt++;});
-  document.getElementById("gpct").textContent=Math.round(tot/cnt)+"%";
-}
+const EQ_DEF=[
+  {id:"backflip",icon:"🤸",label:"Faire un backflip",xp:500,milestones:["Headstand 10s","Backbend fluide","Backflip assisté","Backflip solo !"]},
+  {id:"cuisine5",icon:"🍽️",label:"Cuisiner 5 plats de A à Z",xp:300,milestones:["Plat 1","Plat 2","Plat 3","Plat 4","Plat 5"]},
+  {id:"nihongo",icon:"🎌",label:"+100 mots japonais",xp:400,milestones:["25 mots","50 mots","75 mots","100 mots"]},
+  {id:"meditation7",icon:"🧘",label:"7 jours méditation consécutifs",xp:200,milestones:["Jour 3","Jour 5","Jour 7"]},
+  {id:"sketchbook",icon:"🎨",label:"Carnet de croquis (25 dessins)",xp:350,milestones:["5 dessins","10 dessins","15 dessins","20 dessins","25 dessins !"]},
+  {id:"style",icon:"👔",label:"Style signature (5 tenues)",xp:300,milestones:["Tenue 1","Tenue 2","Tenue 3","Tenue 4","Tenue 5"]},
+  {id:"pullups",icon:"💪",label:"15 tractions",xp:450,milestones:["5 tractions","8 tractions","10 tractions","12 tractions","15 tractions !"]},
+];
 
-function renderForm(){
-  const fg=document.getElementById("fg");fg.innerHTML="";
-  H.forEach(h=>{
-    const days=st.h[h.id]||[],last=days.length>0?days[days.length-1].val:"";
-    const d=document.createElement("div");d.className="field";
-    d.innerHTML=`<label>${h.e} ${h.lbl}</label><input type="number" step="0.1" id="inp_${h.id}" placeholder="${last}"><div class="hint">${h.hint}</div>`;
-    fg.appendChild(d);
+const RD=[
+  {id:"gaming",icon:"🎮",label:"1h de jeux vidéos"},
+  {id:"scroll",icon:"📱",label:"30 min de scroll libre"},
+  {id:"match",icon:"⚽",label:"Match / épisode tard le soir"},
+  {id:"series",icon:"📺",label:"2 épisodes série bonus"},
+];
+const RP=[
+  {id:"p3",icon:"🎮",label:"Récompenses quotidiennes débloquées",lvl:3},
+  {id:"p8",icon:"🇯🇵",label:"Budget Japon (Pokémon, mangas, figurines)",lvl:8},
+  {id:"p12",icon:"😴",label:"Journée off totale sans culpabilité",lvl:12},
+  {id:"p20",icon:"🏆",label:"Grosse récompense — à définir !",lvl:20},
+];
+const CF=[
+  {id:"s1",label:"Scroll excessif",debt:1},
+  {id:"s2",label:"Couché tard (sans raison valable)",debt:1},
+  {id:"s3",label:"Malbouffe",debt:1},
+  {id:"s4",label:"Séance gym ratée sans raison",debt:2},
+];
+const RED=[
+  {id:"r1",icon:"💪",label:"30 pompes",r:1},
+  {id:"r2",icon:"🏃",label:"20 min cardio bonus",r:1},
+  {id:"r3",icon:"📖",label:"30 min lecture bonus",r:1},
+  {id:"r4",icon:"🧘",label:"15 min méditation bonus",r:1},
+];
+
+const CATS={
+  corps:{label:"Corps",icon:"💪",color:C.violet},
+  nutrition:{label:"Nutrition",icon:"🥗",color:C.emerald},
+  cerveau:{label:"Cerveau",icon:"🧠",color:C.sky},
+  apparence:{label:"Apparence",icon:"✨",color:C.amber},
+  discipline:{label:"Discipline",icon:"🎯",color:C.fuchsia},
+};
+
+const TABS=[
+  {id:"dashboard",icon:"🏠",label:"Accueil"},
+  {id:"habits",icon:"📋",label:"Habitudes"},
+  {id:"epic",icon:"⚔️",label:"Épiques"},
+  {id:"profile",icon:"🃏",label:"Profil"},
+  {id:"rewards",icon:"🎁",label:"Récompenses"},
+  {id:"journal",icon:"👁️",label:"Journal"},
+  {id:"settings",icon:"⚙️",label:"Réglages"},
+];
+
+const pct=(v,g)=>Math.min(100,Math.round((v/g)*100));
+const calcSleep=(b,w)=>{if(!b||!w)return 0;const[bh,bm]=b.split(":").map(Number);const[wh,wm]=w.split(":").map(Number);let m=(wh*60+wm)-(bh*60+bm);if(m<0)m+=1440;return Math.round((m/60)*100)/100;};
+const SG=8+40/60;
+
+const mkDef=()=>({
+  xp:0,streaks:{},perfectDays:0,currentStreak:0,todayKey:TODAY(),
+  coreProgress:{},bonusProgress:{},checklistProgress:{},
+  sleepBedtime:null,sleepWake:null,
+  epicProgress:{},epicQuests:EQ_DEF,
+  debt:0,conscience:[],
+  activities:[],
+  activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0},
+  eveningDone:false,eveningNote:{good:"",improve:""},
+  claimedPalier:[],unlockedBadges:[],newBadges:[],
+  gymTotal:0,waterDays:0,onepieceTotal:0,proteinDays:0,veggieDays:0,
+  gymStreak:0,wakeupStreak:0,groomingStreak:0,sleepStreak:0,
+  meditationStreak:0,readingStreak:0,tidyStreak:0,
+  nocturneStreak:0,conscienceCleanStreak:0,proteinStreak:0,veggieStreak:0,
+});
+
+const isCoreOk=s=>CORE.every(h=>{
+  if(h.unit==="check")return Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length>=h.goal;
+  if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
+  return(s.coreProgress?.[h.id]||0)>=h.goal;
+});
+
+const chkBadges=s=>{
+  const r=[],has=id=>(s.unlockedBadges||[]).includes(id),c=(id,cond)=>{if(cond&&!has(id))r.push(id);};
+  c("b_gym10",(s.gymStreak||0)>=10);c("b_gym30",(s.gymTotal||0)>=30);
+  c("b_water7",(s.waterDays||0)>=7);c("b_water30",(s.waterDays||0)>=30);
+  c("b_sleep10",(s.sleepStreak||0)>=10);c("b_wakeup14",(s.wakeupStreak||0)>=14);
+  c("b_backflip",(s.epicProgress?.backflip||0)>=4);
+  c("b_reading20",(s.readingStreak||0)>=20);
+  c("b_japanese",(s.epicProgress?.nihongo||0)>=4);
+  c("b_drawing",(s.epicProgress?.sketchbook||0)>=5);
+  c("b_onepiece30",(s.onepieceTotal||0)>=30);
+  c("b_style",(s.epicProgress?.style||0)>=5);
+  c("b_grooming14",(s.groomingStreak||0)>=14);
+  c("b_cooking",(s.epicProgress?.cuisine5||0)>=5);
+  c("b_tidy10",(s.tidyStreak||0)>=10);
+  c("b_meditation",(s.epicProgress?.meditation7||0)>=3);
+  c("b_nocturne",(s.nocturneStreak||0)>=10);
+  c("b_protein14",(s.proteinStreak||0)>=14);c("b_protein30",(s.proteinDays||0)>=30);
+  c("b_veggie7",(s.veggieStreak||0)>=7);c("b_veggie30",(s.veggieDays||0)>=30);
+  c("b_perfect7",(s.currentStreak||0)>=7);c("b_perfect30",(s.perfectDays||0)>=30);
+  c("b_pure14",(s.conscienceCleanStreak||0)>=14);c("b_streak21",(s.currentStreak||0)>=21);
+  c("b_conscience7",(s.conscienceCleanStreak||0)>=7);
+  const ae=BADGES.filter(b=>b.id!=="b_japan").every(b=>(s.unlockedBadges||[]).includes(b.id));
+  c("b_japan",ae);
+  return r;
+};
+
+// ── SHARED UI ──
+const Crd=({children,style={}})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,...style}}>{children}</div>;
+const Br=({val,max,color,h=7,glow})=>{const p=Math.min((val/max)*100,100);return<div style={{background:C.dim,borderRadius:8,height:h,overflow:"hidden"}}><div style={{height:"100%",width:`${p}%`,background:color,borderRadius:8,transition:"width .5s ease",boxShadow:glow?`0 0 8px ${color}88`:"none"}}/></div>;};
+const Lbl=({children})=><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.sub,textTransform:"uppercase"}}>{children}</div>;
+const Btn=({children,onClick,color,full,small})=>{const dk=[C.gold,C.emerald,C.amber,C.green].includes(color);return<button onClick={onClick} style={{background:color,color:dk?"#000":"#fff",border:"none",borderRadius:small?8:10,padding:small?"6px 12px":"9px 16px",fontWeight:700,fontSize:small?12:13,cursor:"pointer",width:full?"100%":"auto",flexShrink:0,transition:"opacity .15s"}}>{children}</button>;};
+const MStat=({icon,val,label,color})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18}}>{icon}</div><div style={{fontSize:22,fontWeight:900,color,marginTop:2}}>{val}</div><div style={{fontSize:10,color:C.sub,marginTop:1}}>{label}</div></div>;
+const iS={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13};
+const tS={...iS,width:"100%",resize:"none",fontFamily:"inherit"};
+
+// ── IMPACT BADGE ──
+const ImpactPill=({cat,val})=>{
+  if(val===0)return null;
+  const positive=val>0;
+  const catInfo=CATS[cat];
+  return<div style={{display:"inline-flex",alignItems:"center",gap:4,background:positive?"rgba(16,185,129,0.12)":"rgba(244,63,94,0.12)",border:`1px solid ${positive?C.emerald:C.rose}40`,borderRadius:20,padding:"3px 8px",fontSize:11,fontWeight:700,color:positive?C.emerald:C.rose}}>
+    {catInfo?.icon} {positive?"+":""}{val}%
+  </div>;
+};
+
+// ── AI ACTIVITY ANALYSIS ──
+async function analyzeActivity(text){
+  const prompt=`Tu es un assistant qui analyse les activités d'un jeune homme de 18 ans et leur impact sur 5 catégories de vie: corps, nutrition, cerveau, apparence, discipline.
+
+Activité décrite: "${text}"
+
+Retourne UNIQUEMENT un objet JSON valide (sans markdown, sans backticks) avec exactement ces 5 clés et des valeurs entières entre -20 et +20 (0 si pas d'impact):
+{"corps":0,"nutrition":0,"cerveau":0,"apparence":0,"discipline":0}
+
+Exemples:
+- "joué aux échecs 1h" → {"corps":0,"nutrition":0,"cerveau":8,"apparence":0,"discipline":5}
+- "scrollé TikTok 2h" → {"corps":-3,"nutrition":0,"cerveau":-5,"apparence":0,"discipline":-8}
+- "fait 50 pompes" → {"corps":10,"nutrition":0,"cerveau":0,"apparence":2,"discipline":7}
+- "mangé une pizza" → {"corps":-3,"nutrition":-6,"cerveau":0,"apparence":-2,"discipline":-3}
+- "lu un livre 1h" → {"corps":0,"nutrition":0,"cerveau":9,"apparence":0,"discipline":6}
+- "médité 15 min" → {"corps":2,"nutrition":0,"cerveau":5,"apparence":0,"discipline":8}
+
+Sois précis et honnête sur les impacts négatifs. Réponds UNIQUEMENT avec le JSON.`;
+
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-6",
+      max_tokens:150,
+      messages:[{role:"user",content:prompt}]
+    })
   });
-  P.forEach(p=>{
-    const v=st.p[p.id]!==undefined?st.p[p.id]:p.cur;
-    const d=document.createElement("div");d.className="field";
-    d.innerHTML=`<label>${p.e} ${p.lbl}</label><input type="number" step="0.1" id="inp_${p.id}" placeholder="${v}"><div class="hint">${p.hint}</div>`;
-    fg.appendChild(d);
-  });
+  const data=await resp.json();
+  const txt=data.content?.map(x=>x.text||"").join("")||"{}";
+  try{return JSON.parse(txt.trim());}
+  catch{return{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};}
 }
 
-function renderLog(){
-  const el=document.getElementById("log");
-  if(!st.log||!st.log.length){el.innerHTML='<div class="loge" style="color:#bbb">Aucune entrée pour l\'instant — à ce soir !</div>';return;}
-  el.innerHTML=st.log.slice().reverse().slice(0,7).map(e=>`<div class="loge"><span class="logd">${e.date}</span>${e.summary}</div>`).join("");
+// ── DASHBOARD ──
+function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
+  const[eo,setEo]=useState(false);
+  const[good,setGood]=useState(s.eveningNote?.good||"");
+  const[imp,setImp]=useState(s.eveningNote?.improve||"");
+  const dtj=Math.max(0,Math.ceil((new Date("2026-07-11")-new Date())/86400000));
+  const save=()=>{update(p=>({...p,eveningDone:true,eveningNote:{good,improve:imp}}));showT("Bilan enregistré ✓",C.emerald);setEo(false);};
+  const cnt=CORE.filter(h=>{
+    if(h.unit==="check")return Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length>=h.goal;
+    if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
+    return(s.coreProgress?.[h.id]||0)>=h.goal;
+  }).length;
+
+  return<div style={{display:"flex",flexDirection:"column",gap:14,animation:"slideUp .3s ease"}}>
+    {/* Japan countdown */}
+    <div style={{background:"linear-gradient(135deg,#0d1117,#1a0a2e)",border:`1px solid ${C.purple}40`,borderRadius:16,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <div><div style={{fontSize:11,color:C.sub,letterSpacing:2,textTransform:"uppercase"}}>Départ pour le Japon</div><div style={{fontSize:13,color:C.text,marginTop:2}}>11 juillet 2026</div></div>
+      <div style={{textAlign:"right"}}><div style={{fontSize:36,fontWeight:900,color:C.violet,lineHeight:1}}>{dtj}</div><div style={{fontSize:11,color:C.sub}}>jours restants</div></div>
+    </div>
+
+    {/* Global score */}
+    <Crd>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
+        <div><Lbl>SCORE DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:gs>=80?C.emerald:gs>=50?C.gold:C.rose,lineHeight:1.1,marginTop:4}}>{gs}%</div></div>
+        <div style={{textAlign:"right"}}>{cc&&<div style={{color:C.emerald,fontWeight:700,fontSize:12}}>🏆 Journée parfaite !</div>}<div style={{fontSize:11,color:C.sub,marginTop:4}}>{cnt}/{CORE.length} core</div></div>
+      </div>
+      <Br val={gs} max={100} color={gs>=80?C.emerald:gs>=50?C.gold:C.violet} glow/>
+    </Crd>
+
+    {/* Category scores */}
+    <Crd>
+      <Lbl>PAR CATÉGORIE</Lbl>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
+        {Object.entries(CATS).map(([k,cat])=>{
+          const base=cs[k]||0;
+          const bonus=s.activityImpacts?.[k]||0;
+          const total=Math.max(0,Math.min(100,base+bonus));
+          return<div key={k} style={{background:C.surface,borderRadius:12,padding:"10px 12px",border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+              <span style={{fontSize:13,fontWeight:600}}>{cat.icon} {cat.label}</span>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                {bonus!==0&&<ImpactPill cat={k} val={bonus}/>}
+                <span style={{fontWeight:800,fontSize:13,color:total>=80?C.emerald:total>=50?C.gold:C.sub}}>{total}%</span>
+              </div>
+            </div>
+            <Br val={total} max={100} color={cat.color} h={5}/>
+          </div>;
+        })}
+      </div>
+    </Crd>
+
+    {/* Stats */}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      <MStat icon="🔥" val={s.currentStreak} label="Streak" color={C.amber}/>
+      <MStat icon="✅" val={s.perfectDays} label="Parfaits" color={C.emerald}/>
+      <MStat icon="🏅" val={s.unlockedBadges?.length||0} label="Badges" color={C.gold}/>
+    </div>
+
+    {/* Evening bilan */}
+    <Crd style={{border:`1px solid ${s.eveningDone?C.emerald:C.border}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><Lbl>BILAN DU SOIR</Lbl><div style={{fontSize:11,color:C.sub,marginTop:3}}>5 min pour ancrer ta journée</div></div>
+        {s.eveningDone?<span style={{color:C.emerald,fontWeight:700,fontSize:13}}>✓ Fait</span>:<Btn onClick={()=>setEo(!eo)} color={C.purple}>Remplir</Btn>}
+      </div>
+      {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+        <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>✅ Une chose bien faite aujourd'hui</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ex: j'ai fait ma séance sans me forcer..."/></div>
+        <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🔧 Une chose à améliorer demain</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Ex: j'ai trop scrollé après 22h..."/></div>
+        <Btn onClick={save} color={C.emerald} full>Enregistrer</Btn>
+      </div>}
+      {s.eveningDone&&(s.eveningNote?.good||s.eveningNote?.improve)&&<div style={{marginTop:10,fontSize:12,color:C.sub}}>
+        {s.eveningNote.good&&<div>✅ {s.eveningNote.good}</div>}
+        {s.eveningNote.improve&&<div style={{marginTop:4}}>🔧 {s.eveningNote.improve}</div>}
+      </div>}
+    </Crd>
+  </div>;
 }
 
-function showToast(msg){
-  const t=document.getElementById("toast");
-  t.textContent=msg;
-  t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),2500);
+// ── HABITS ──
+function HRow({h,val,complete,isBonus}){
+  return<div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:22}}>{h.icon}</span>
+      <div>
+        <div style={{fontWeight:700,fontSize:14}}>{h.label}{isBonus&&<span style={{fontSize:9,color:C.gold,marginLeft:6,fontWeight:700}}>BONUS</span>}</div>
+        <div style={{fontSize:11,color:C.sub}}>{h.xp} XP</div>
+      </div>
+    </div>
+    <div style={{fontWeight:800,fontSize:17,color:complete?C.emerald:C.text}}>{val}</div>
+  </div>;
 }
 
-function saveDay(){
-  const today=new Date().toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});
-  const changes=[];
-  H.forEach(h=>{
-    const inp=document.getElementById("inp_"+h.id);
-    if(inp&&inp.value!==""){
-      const v=parseFloat(inp.value);
-      if(!isNaN(v)){
-        if(!st.h[h.id])st.h[h.id]=[];
-        const p=pts(h,v);
-        st.h[h.id].push({date:today,val:v,p});
-        if(st.h[h.id].length>D)st.h[h.id].shift();
-        changes.push(h.e+" "+h.t+" → "+hpct(h.id)+"%");
-        inp.value="";
+function Habits({s,update,showT,sp}){
+  const[view,setView]=useState("core");
+
+  const addP=(id,amt,isB=false,e)=>{
+    if(e)sp(e.clientX,e.clientY);
+    update(p=>{
+      const key=isB?"bonusProgress":"coreProgress";
+      const h=(isB?BONUS:CORE).find(x=>x.id===id);if(!h)return p;
+      const cur=p[key]?.[id]||0,nxt=Math.min(cur+amt,h.goal);
+      const wasD=cur>=h.goal,nowD=nxt>=h.goal;
+      if(!wasD&&nowD){
+        const st=(p.streaks?.[id]||0)+1,bon=st>=3?Math.floor(h.xp*.25*Math.min(st-2,5)):0,xg=h.xp+bon;
+        const ex={};
+        if(id==="gym"){ex.gymTotal=(p.gymTotal||0)+1;ex.gymStreak=(p.gymStreak||0)+1;}
+        if(id==="water")ex.waterDays=(p.waterDays||0)+1;
+        if(id==="onepiece")ex.onepieceTotal=(p.onepieceTotal||0)+amt;
+        if(id==="wakeup")ex.wakeupStreak=(p.wakeupStreak||0)+1;
+        if(id==="meditation")ex.meditationStreak=(p.meditationStreak||0)+1;
+        if(id==="reading")ex.readingStreak=(p.readingStreak||0)+1;
+        if(id==="tidy")ex.tidyStreak=(p.tidyStreak||0)+1;
+        if(id==="protein"){ex.proteinDays=(p.proteinDays||0)+1;ex.proteinStreak=(p.proteinStreak||0)+1;}
+        if(id==="veggies"){ex.veggieDays=(p.veggieDays||0)+1;ex.veggieStreak=(p.veggieStreak||0)+1;}
+        setTimeout(()=>showT(`${h.icon} ${h.label} ✓ +${xg}XP${bon?` 🔥×${st}`:""}`,C.violet),10);
+        return{...p,[key]:{...p[key],[id]:nxt},xp:p.xp+xg,streaks:{...p.streaks,[id]:st},...ex};
       }
+      return{...p,[key]:{...p[key],[id]:nxt}};
+    });
+  };
+
+  const togChk=(i,e)=>{
+    if(e)sp(e.clientX,e.clientY);
+    update(p=>{
+      const cur=p.checklistProgress?.grooming||{},nxt={...cur,[i]:!cur[i]};
+      const done=Object.values(nxt).filter(Boolean).length;
+      const wasD=Object.values(cur).filter(Boolean).length>=4,nowD=done>=4;
+      const xg=(!wasD&&nowD)?30:0;
+      if(!wasD&&nowD)setTimeout(()=>showT("✨ Routine apparence ✓ +30XP",C.amber),10);
+      return{...p,checklistProgress:{grooming:nxt},xp:p.xp+xg,groomingStreak:(!wasD&&nowD)?(p.groomingStreak||0)+1:p.groomingStreak};
+    });
+  };
+
+  const setSl=(f,v)=>update(p=>{
+    const nb={...p,[f]:v};const sh=calcSleep(nb.sleepBedtime,nb.sleepWake);
+    if(sh>=SG&&calcSleep(p.sleepBedtime,p.sleepWake)<SG){
+      setTimeout(()=>showT("😴 Sommeil atteint ! +35XP",C.purple),10);
+      return{...nb,xp:p.xp+35,sleepStreak:(p.sleepStreak||0)+1};
     }
+    return nb;
   });
-  P.forEach(p=>{
-    const inp=document.getElementById("inp_"+p.id);
-    if(inp&&inp.value!==""){
-      const v=parseFloat(inp.value);
-      if(!isNaN(v)){st.p[p.id]=v;changes.push(p.e+" "+p.t+" → "+ppct(p)+"%");inp.value="";}
+
+  const rH=(h,isB=false)=>{
+    if(h.unit==="check"){
+      const chks=s.checklistProgress?.grooming||{},done=Object.values(chks).filter(Boolean).length,cmp=done>=h.goal;
+      return<Crd key={h.id} style={{borderLeft:`3px solid ${cmp?C.emerald:h.color}`}}>
+        <HRow h={h} val={`${done}/${h.goal}`} complete={cmp} isBonus={isB}/>
+        <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
+          {h.checklist.map((item,i)=><button key={i} onClick={e=>togChk(i,e)} style={{background:chks[i]?"rgba(16,185,129,0.08)":C.surface,border:`1px solid ${chks[i]?C.emerald:C.border}`,borderRadius:10,padding:"9px 12px",cursor:"pointer",color:C.text,display:"flex",alignItems:"center",gap:10,fontSize:13}}>
+            <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${chks[i]?C.emerald:C.muted}`,background:chks[i]?C.emerald:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:10}}>{chks[i]&&"✓"}</div>{item}
+          </button>)}
+        </div>
+      </Crd>;
     }
-  });
-  if(changes.length){if(!st.log)st.log=[];st.log.push({date:today,summary:changes.join(" | ")});}
-  save(st);
-  renderAll();
-  renderLog();
-  showToast("✅ Journée enregistrée !");
+    if(h.id==="sleep"){
+      const sh=calcSleep(s.sleepBedtime,s.sleepWake),done=sh>=SG;
+      return<Crd key="sleep" style={{borderLeft:`3px solid ${done?C.emerald:C.purple}`}}>
+        <HRow h={h} val={sh?`${sh}h`:"—"} complete={done} isBonus={false}/>
+        <div style={{display:"flex",gap:10,marginTop:10}}>
+          <div style={{flex:1}}><div style={{fontSize:10,color:C.sub,marginBottom:4}}>🌙 Coucher</div><input type="time" value={s.sleepBedtime||""} onChange={e=>setSl("sleepBedtime",e.target.value)} style={{...iS,width:"100%"}}/></div>
+          <div style={{flex:1}}><div style={{fontSize:10,color:C.sub,marginBottom:4}}>☀️ Réveil</div><input type="time" value={s.sleepWake||""} onChange={e=>setSl("sleepWake",e.target.value)} style={{...iS,width:"100%"}}/></div>
+        </div>
+        {sh>0&&<div style={{marginTop:8}}><Br val={sh} max={SG} color={done?C.emerald:C.purple} glow/><div style={{fontSize:11,color:C.sub,marginTop:4}}>{sh}h / {SG.toFixed(1)}h</div></div>}
+      </Crd>;
+    }
+    const pk=isB?"bonusProgress":"coreProgress",cur=s[pk]?.[h.id]||0,done=cur>=h.goal;
+    return<Crd key={h.id} style={{borderLeft:`3px solid ${done?C.emerald:h.color}`}}>
+      <HRow h={h} val={h.unit==="bool"?(done?"✓":"—"):`${cur}${h.unit}`} complete={done} isBonus={isB}/>
+      {h.unit!=="bool"&&<div style={{marginTop:8}}><Br val={cur} max={h.goal} color={done?C.emerald:h.color} glow={done}/></div>}
+      {!done&&<div style={{display:"flex",gap:8,marginTop:10}}>
+        <Btn onClick={e=>addP(h.id,h.step,isB,e)} color={h.color} full>+{h.step}{h.unit==="bool"?"":h.unit}</Btn>
+        {h.unit!=="bool"&&h.step*2<=h.goal&&<Btn onClick={e=>addP(h.id,h.step*2,isB,e)} color={C.muted}>+{h.step*2}{h.unit}</Btn>}
+      </div>}
+      {done&&<div style={{marginTop:8,color:C.emerald,fontWeight:700,fontSize:12}}>✓ Complété !</div>}
+    </Crd>;
+  };
+
+  return<div>
+    <div style={{display:"flex",gap:8,marginBottom:14}}>
+      {["core","bonus"].map(v=><button key={v} onClick={()=>setView(v)} style={{background:view===v?C.purple:C.surface,color:view===v?"#fff":C.sub,border:`1px solid ${view===v?C.purple:C.border}`,borderRadius:20,padding:"7px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{v==="core"?"Obligatoires":"✨ Bonus"}</button>)}
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {view==="core"&&CORE.map(h=>rH(h,false))}
+      {view==="bonus"&&<><div style={{fontSize:12,color:C.sub,padding:"0 2px"}}>XP bonus — ne bloquent pas les récompenses.</div>{BONUS.map(h=>rH(h,true))}</>}
+    </div>
+  </div>;
 }
 
-function resetAll(){
-  if(confirm("Réinitialiser tout le tracker ?")){
-    st={h:{},p:{},log:[]};
-    save(st);
-    renderAll();
-    renderForm();
-    renderLog();
-  }
+// ── EPIC ──
+function Epic({s,update,showT}){
+  const[adding,setAdding]=useState(false);
+  const[label,setLabel]=useState("");const[ms,setMs]=useState("");const[xpv,setXpv]=useState("300");
+
+  const setM=(qid,idx)=>update(p=>{
+    const q=p.epicQuests.find(x=>x.id===qid);if(!q||(p.epicProgress?.[qid]||0)>idx)return p;
+    const xp=Math.floor(q.xp/q.milestones.length);
+    setTimeout(()=>showT(`⚔️ ${q.milestones[idx]} ! +${xp}XP`,C.fuchsia),10);
+    return{...p,epicProgress:{...p.epicProgress,[qid]:idx+1},xp:p.xp+xp};
+  });
+
+  const add=()=>{
+    if(!label.trim())return;
+    const m=ms.split(",").map(x=>x.trim()).filter(Boolean);if(!m.length)m.push("Terminé !");
+    update(p=>({...p,epicQuests:[...p.epicQuests,{id:"c_"+Date.now(),icon:"⭐",label,xp:parseInt(xpv)||300,milestones:m}]}));
+    showT("Quête épique ajoutée !",C.gold);setAdding(false);setLabel("");setMs("");setXpv("300");
+  };
+
+  return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    {s.epicQuests.map(q=>{
+      const prog=s.epicProgress?.[q.id]||0,done=prog>=q.milestones.length;
+      return<Crd key={q.id} style={{background:done?"linear-gradient(135deg,#1a1200,#1a1a28)":C.card}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <div style={{width:44,height:44,borderRadius:12,background:`${C.purple}20`,border:`1px solid ${C.purple}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{q.icon}</div>
+            <div><div style={{fontWeight:700,fontSize:14}}>{q.label}</div><div style={{fontSize:11,color:C.sub}}>{q.xp} XP · {prog}/{q.milestones.length} étapes</div></div>
+          </div>
+          {done&&<span style={{fontSize:22}}>🏆</span>}
+        </div>
+        <Br val={prog} max={q.milestones.length} color={done?C.gold:C.fuchsia} glow={done}/>
+        <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+          {q.milestones.map((m,i)=>{const r=prog>i,nx=prog===i;return<div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>!r&&setM(q.id,i)} style={{width:28,height:28,borderRadius:"50%",flexShrink:0,border:`2px solid ${r?C.fuchsia:nx?"#fff":C.dim}`,background:r?C.fuchsia:"transparent",color:r?"#fff":nx?C.text:C.dim,cursor:r?"default":nx?"pointer":"not-allowed",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:r?`0 0 10px ${C.fuchsia}66`:"none"}}>{r?"✓":i+1}</button>
+            <span style={{fontSize:13,color:r?C.text:nx?C.text:C.sub}}>{m}</span>
+            {nx&&<span style={{fontSize:10,color:C.fuchsia,marginLeft:"auto",fontWeight:700}}>← Suivant</span>}
+          </div>;})}
+        </div>
+      </Crd>;
+    })}
+    {!adding
+      ?<button onClick={()=>setAdding(true)} style={{background:C.surface,border:`1px dashed ${C.muted}`,borderRadius:14,padding:16,color:C.sub,fontSize:13,cursor:"pointer",fontWeight:700}}>+ Ajouter une quête épique</button>
+      :<Crd><Lbl>NOUVELLE QUÊTE</Lbl><div style={{display:"flex",flexDirection:"column",gap:10,marginTop:10}}>
+        <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Nom de la quête" style={{...iS,width:"100%"}}/>
+        <input value={ms} onChange={e=>setMs(e.target.value)} placeholder="Étapes séparées par des virgules" style={{...iS,width:"100%"}}/>
+        <input value={xpv} onChange={e=>setXpv(e.target.value)} placeholder="XP total" type="number" style={{...iS,width:"100%"}}/>
+        <div style={{display:"flex",gap:8}}><Btn onClick={add} color={C.emerald} full>Ajouter</Btn><Btn onClick={()=>setAdding(false)} color={C.muted}>Annuler</Btn></div>
+      </div></Crd>
+    }
+  </div>;
 }
 
-document.getElementById("today").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-renderAll();
-renderForm();
-renderLog();
+// ── PROFILE ──
+function Profile({s,lvl,rank}){
+  const ul=s.unlockedBadges||[];
+  const[filter,setFilter]=useState("all");
+  const cats=["all","Corps","Cerveau","Nutrition","Style","Discipline","Légendaire"];
+  const filtered=filter==="all"?BADGES:BADGES.filter(b=>b.cat===filter);
+
+  return<div style={{display:"flex",flexDirection:"column",gap:14,animation:"slideUp .3s ease"}}>
+    {/* Player card */}
+    <div style={{background:"linear-gradient(135deg,#0d0a20 0%,#1a0d35 50%,#0a1520 100%)",border:`1px solid ${rank.color}40`,borderRadius:20,padding:20,position:"relative",overflow:"hidden",boxShadow:`0 0 30px ${rank.color}22`}}>
+      <div style={{position:"absolute",top:-20,right:-20,fontSize:80,opacity:.06}}>{rank.icon}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <div style={{fontSize:10,color:C.sub,letterSpacing:2,textTransform:"uppercase"}}>Amaury</div>
+          <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,marginTop:4}}>Niveau {lvl.lvl}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}><span style={{fontSize:18}}>{rank.icon}</span><span style={{fontSize:13,fontWeight:700,color:rank.color}}>{rank.name}</span></div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:22,fontWeight:900,color:C.gold}}>{s.xp.toLocaleString()}</div>
+          <div style={{fontSize:10,color:C.sub}}>XP total</div>
+          <div style={{marginTop:8,fontSize:14,fontWeight:700,color:C.amber}}>🔥 {s.currentStreak} jours</div>
+        </div>
+      </div>
+      <div style={{marginTop:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub,marginBottom:4}}><span>→ niv.{lvl.lvl+1}</span><span>{Math.round(lvl.rem)}/{lvl.needed} XP</span></div>
+        <Br val={lvl.rem} max={lvl.needed} color={rank.color} glow/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginTop:14}}>
+        {[{v:s.perfectDays||0,l:"Parfaits"},{v:ul.length,l:"Badges"},{v:s.gymTotal||0,l:"Gym"}].map(({v,l})=><div key={l} style={{background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"8px 6px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:900,color:C.text}}>{v}</div><div style={{fontSize:9,color:C.sub,marginTop:1}}>{l}</div></div>)}
+      </div>
+      {lvl.lvl<50&&(()=>{const nx=RANKS.find(r=>r.min>lvl.lvl);return nx?<div style={{marginTop:12,padding:"8px 12px",background:"rgba(255,255,255,0.04)",borderRadius:10,fontSize:12,color:C.sub}}>Prochain rang : <span style={{color:nx.color,fontWeight:700}}>{nx.icon} {nx.name}</span> au niv.{nx.min}</div>:null;})()}
+    </div>
+
+    {/* Badges */}
+    <Crd>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><Lbl>BADGES ({ul.length}/{BADGES.length})</Lbl></div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+        {cats.map(c=><button key={c} onClick={()=>setFilter(c)} style={{background:filter===c?C.purple:C.surface,color:filter===c?"#fff":C.sub,border:`1px solid ${filter===c?C.purple:C.border}`,borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{c==="all"?"Tous":c}</button>)}
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {filtered.map(b=>{
+          const got=ul.includes(b.id),rc=RC[b.rarity],isNew=s.newBadges?.includes(b.id);
+          return<div key={b.id} style={{background:got?rc.bg:C.surface,border:`1px solid ${got?rc.border:C.border}`,borderRadius:12,padding:"10px 14px",display:"flex",gap:12,alignItems:"center",opacity:got?1:0.4,boxShadow:got?rc.glow:"none",position:"relative"}}>
+            {isNew&&<div style={{position:"absolute",top:-4,right:-4,background:C.gold,borderRadius:"50%",width:12,height:12,animation:"shimmer 1.5s infinite"}}/>}
+            <span style={{fontSize:24,filter:got?"none":"grayscale(1)"}}>{b.icon}</span>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:got?rc.text:C.sub}}>{b.name}</div><div style={{fontSize:11,color:C.sub,marginTop:2}}>{b.desc}</div></div>
+            <div style={{fontSize:9,fontWeight:800,color:rc.text,textTransform:"uppercase",letterSpacing:1,opacity:got?1:0.5}}>{b.rarity}</div>
+          </div>;
+        })}
+      </div>
+    </Crd>
+  </div>;
+}
+
+// ── REWARDS ──
+function Rewards({s,lvl,cc,update,showT}){
+  const dc=s.debt===0,du=lvl.lvl>=3&&cc&&dc;
+  return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <Crd>
+      <Lbl>RÉCOMPENSES QUOTIDIENNES</Lbl>
+      <div style={{fontSize:12,color:du?C.emerald:C.rose,marginTop:6,marginBottom:12,fontWeight:600}}>
+        {du?"✅ Méritées — profites-en sans culpabilité !":!dc?`⚠️ Efface tes ${s.debt} dette(s) d'abord`:!cc?"Complète tes habitudes core d'abord":"Niveau 3 requis"}
+      </div>
+      {RD.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${C.border}`,opacity:du?1:0.35}}>
+        <span style={{fontSize:24}}>{r.icon}</span>
+        <span style={{fontSize:14,fontWeight:500}}>{r.label}</span>
+        {du&&<span style={{marginLeft:"auto",color:C.emerald,fontSize:12,fontWeight:700}}>Débloqué 🔓</span>}
+      </div>)}
+    </Crd>
+    <Crd>
+      <Lbl>PALIERS DE NIVEAU</Lbl>
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+        {RP.map(r=>{const ul=lvl.lvl>=r.lvl,cl=s.claimedPalier?.includes(r.id);return<div key={r.id} style={{display:"flex",alignItems:"center",gap:12,opacity:ul?1:0.4}}>
+          <span style={{fontSize:26}}>{r.icon}</span>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{r.label}</div><div style={{fontSize:11,color:ul?C.emerald:C.sub}}>{ul?"Débloqué !":"Niveau "+r.lvl+" requis"}</div></div>
+          {ul&&!cl&&<Btn onClick={()=>{update(p=>({...p,claimedPalier:[...(p.claimedPalier||[]),r.id]}));showT("🎁 Réclamé !",C.gold);}} color={C.gold}>Réclamer</Btn>}
+          {cl&&<span style={{color:C.emerald,fontWeight:800}}>✓</span>}
+        </div>;})}
+      </div>
+    </Crd>
+  </div>;
+}
+
+// ── JOURNAL (Activities + Conscience) ──
+function Journal({s,update,showT}){
+  const[section,setSection]=useState("activities");
+  const[input,setInput]=useState("");
+  const[loading,setLoading]=useState(false);
+
+  const analyze=async()=>{
+    if(!input.trim())return;
+    setLoading(true);
+    try{
+      const impacts=await analyzeActivity(input.trim());
+      const activity={id:Date.now(),text:input.trim(),impacts,time:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
+      update(p=>{
+        const newActivities=[...(p.activities||[]),activity];
+        const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+        newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
+        return{...p,activities:newActivities,activityImpacts:newImpacts};
+      });
+      showT("Activité analysée !",C.sky);
+      setInput("");
+    }catch(e){showT("Erreur d'analyse",C.red);}
+    setLoading(false);
+  };
+
+  const removeActivity=(id)=>{
+    update(p=>{
+      const newActivities=(p.activities||[]).filter(a=>a.id!==id);
+      const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+      newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
+      return{...p,activities:newActivities,activityImpacts:newImpacts};
+    });
+  };
+
+  const addFault=f=>{update(p=>({...p,debt:p.debt+f.debt,conscience:[...(p.conscience||[]),{date:TODAY(),label:f.label,debt:f.debt}]}));showT(`+${f.debt} dette`,C.red);};
+  const redeem=r=>{if(s.debt<=0){showT("Aucune dette !",C.sub);return;}update(p=>({...p,debt:Math.max(0,p.debt-r.r)}));showT(`${r.icon} Rachat ! -${r.r} dette`,C.emerald);};
+
+  const todayActs=(s.activities||[]);
+  const todayFaults=(s.conscience||[]).filter(e=>e.date===TODAY());
+
+  return<div style={{display:"flex",flexDirection:"column",gap:14,animation:"slideUp .3s ease"}}>
+
+    {/* Section tabs */}
+    <div style={{display:"flex",gap:8}}>
+      {[{id:"activities",label:"⚡ Activités",color:C.sky},{id:"conscience",label:"👁️ Conscience",color:C.rose}].map(t=><button key={t.id} onClick={()=>setSection(t.id)} style={{flex:1,background:section===t.id?t.color+"22":C.surface,color:section===t.id?t.color:C.sub,border:`1px solid ${section===t.id?t.color:C.border}`,borderRadius:12,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t.label}</button>)}
+    </div>
+
+    {section==="activities"&&<>
+      {/* Activity input */}
+      <Crd>
+        <Lbl>AJOUTE UNE ACTIVITÉ</Lbl>
+        <div style={{fontSize:11,color:C.sub,marginTop:4,marginBottom:12}}>Décris ce que tu as fait — l'IA analyse l'impact sur tes catégories.</div>
+        <textarea
+          value={input}
+          onChange={e=>setInput(e.target.value)}
+          placeholder="Ex: joué aux échecs 1h, scrollé TikTok 45 min, fait 50 pompes, lu un manga..."
+          style={{...tS,height:72}}
+        />
+        <div style={{marginTop:10}}>
+          <Btn onClick={analyze} color={loading?C.muted:C.sky} full>
+            {loading?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{display:"inline-block",width:12,height:12,border:`2px solid #fff`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Analyse en cours...</span>:"⚡ Analyser l'impact"}
+          </Btn>
+        </div>
+      </Crd>
+
+      {/* Today's activities */}
+      {todayActs.length>0&&<Crd>
+        <Lbl>ACTIVITÉS DU JOUR ({todayActs.length})</Lbl>
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
+          {todayActs.map(a=>{
+            const hasImpact=Object.values(a.impacts).some(v=>v!==0);
+            return<div key={a.id} style={{background:C.surface,borderRadius:12,padding:"10px 12px",border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{a.text}</div>
+                  {hasImpact&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                    {Object.entries(a.impacts).filter(([,v])=>v!==0).map(([k,v])=><ImpactPill key={k} cat={k} val={v}/>)}
+                  </div>}
+                  {!hasImpact&&<span style={{fontSize:11,color:C.sub}}>Aucun impact significatif détecté</span>}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
+                  <span style={{fontSize:10,color:C.sub}}>{a.time}</span>
+                  <button onClick={()=>removeActivity(a.id)} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:16,padding:0,lineHeight:1}}>×</button>
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>
+      </Crd>}
+
+      {todayActs.length===0&&<div style={{textAlign:"center",padding:"30px 20px",color:C.sub,fontSize:13}}>
+        <div style={{fontSize:32,marginBottom:8}}>⚡</div>
+        Aucune activité libre enregistrée aujourd'hui.<br/>Ajoute ce que tu as fait pour voir l'impact sur tes catégories.
+      </div>}
+    </>}
+
+    {section==="conscience"&&<>
+      {/* Debt meter */}
+      <Crd style={{border:`1px solid ${s.debt>0?C.red:C.emerald}40`}}>
+        <Lbl>DETTE ACTUELLE</Lbl>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10}}>
+          <div style={{fontSize:48,fontWeight:900,color:s.debt>0?C.rose:C.emerald,lineHeight:1,textShadow:s.debt>0?`0 0 20px ${C.red}`:undefined}}>{s.debt}</div>
+          <div style={{fontSize:13,color:s.debt>0?C.rose:C.emerald,fontWeight:600}}>{s.debt===0?"Conscience nette 🟢":s.debt===1?"Rachat requis":`${s.debt} rachats requis`}</div>
+        </div>
+        {s.debt>0&&<div style={{marginTop:10}}><Br val={Math.min(s.debt,5)} max={5} color={C.red}/></div>}
+      </Crd>
+
+      {/* Log fault */}
+      <Crd>
+        <Lbl>NOTER UNE FAUTE</Lbl>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+          {CF.map(f=><button key={f.id} onClick={()=>addFault(f)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 14px",cursor:"pointer",color:C.text,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
+            <span>{f.label}</span><span style={{color:C.rose,fontWeight:800}}>+{f.debt}</span>
+          </button>)}
+        </div>
+      </Crd>
+
+      {/* Redeem */}
+      <Crd>
+        <Lbl>SE RACHETER</Lbl>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+          {RED.map(r=><button key={r.id} onClick={()=>redeem(r)} style={{background:s.debt>0?"rgba(16,185,129,0.07)":C.surface,border:`1px solid ${s.debt>0?C.emerald:C.border}`,borderRadius:10,padding:"11px 14px",cursor:"pointer",color:C.text,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
+            <span>{r.icon} {r.label}</span><span style={{color:C.emerald,fontWeight:800}}>-{r.r}</span>
+          </button>)}
+        </div>
+      </Crd>
+
+      {/* Today's faults log */}
+      {todayFaults.length>0&&<Crd>
+        <Lbl>LOG DU JOUR</Lbl>
+        <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
+          {todayFaults.map((e,i)=><div key={i} style={{fontSize:12,color:C.sub,display:"flex",justifyContent:"space-between"}}>
+            <span>⚠️ {e.label}</span><span style={{color:C.rose}}>+{e.debt}</span>
+          </div>)}
+        </div>
+      </Crd>}
+    </>}
+  </div>;
+}
+
+// ── SETTINGS ──
+function Settings({s,update,showT}){
+  const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},activities:[],activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
+  const ra=()=>{update(()=>mkDef());showT("Données effacées",C.red);};
+  return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{fontSize:12,color:C.sub}}>⚠️ Zone sensible.</div>
+    <Crd style={{border:`1px solid ${C.red}40`}}>
+      <Lbl>ACTIONS</Lbl>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
+        <div><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Remet les compteurs du jour à zéro (XP conservé)</div><Btn onClick={rd} color={C.amber} full>Réinitialiser la journée</Btn></div>
+        <div style={{marginTop:6}}><div style={{fontSize:12,color:C.sub,marginBottom:6}}>Efface toutes les données</div><Btn onClick={ra} color={C.red} full>Tout réinitialiser</Btn></div>
+      </div>
+    </Crd>
+    <Crd>
+      <Lbl>STATISTIQUES</Lbl>
+      <div style={{fontSize:12,color:C.sub,marginTop:10,lineHeight:1.8}}>
+        <div>XP total : <span style={{color:C.text,fontWeight:700}}>{s.xp}</span></div>
+        <div>Niveau : <span style={{color:C.text,fontWeight:700}}>{getLvl(s.xp).lvl}</span></div>
+        <div>Badges : <span style={{color:C.text,fontWeight:700}}>{s.unlockedBadges?.length||0}/{BADGES.length}</span></div>
+        <div>Séances gym : <span style={{color:C.text,fontWeight:700}}>{s.gymTotal||0}</span></div>
+        <div>Jours protéines : <span style={{color:C.text,fontWeight:700}}>{s.proteinDays||0}</span></div>
+        <div>Épisodes One Piece : <span style={{color:C.text,fontWeight:700}}>{s.onepieceTotal||0}</span></div>
+      </div>
+    </Crd>
+  </div>;
+}
+
+// ── MAIN APP ──
+function App(){
+  const[s,setS]=useState(null);
+  const[tab,setTab]=useState("dashboard");
+  const[toast,setToast]=useState(null);
+  const[parts,setParts]=useState([]);
+  const[loaded,setLoaded]=useState(false);
+
+  useEffect(()=>{
+    try{
+      const raw=localStorage.getItem(SK);
+      if(raw){
+        const p=JSON.parse(raw);
+        if(p.todayKey!==TODAY()){
+          const ok=isCoreOk(p);
+          if(ok){p.perfectDays=(p.perfectDays||0)+1;p.currentStreak=(p.currentStreak||0)+1;const cs=p.currentStreak;if(cs%7===0)p.xp=(p.xp||0)+100;else if(cs%3===0)p.xp=(p.xp||0)+50;}
+          else p.currentStreak=0;
+          if(p.debt===0)p.conscienceCleanStreak=(p.conscienceCleanStreak||0)+1;else p.conscienceCleanStreak=0;
+          p.coreProgress={};p.bonusProgress={};p.checklistProgress={};
+          p.sleepBedtime=null;p.sleepWake=null;
+          p.eveningDone=false;p.eveningNote={good:"",improve:""};
+          p.activities=[];p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+          p.todayKey=TODAY();
+          const nb=chkBadges(p);if(nb.length){p.unlockedBadges=[...(p.unlockedBadges||[]),...nb];p.newBadges=nb;}
+        }
+        if(!p.activities)p.activities=[];
+        if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+        setS(p);
+      }else setS(mkDef());
+    }catch{setS(mkDef());}
+    setLoaded(true);
+  },[]);
+
+  const persist=useCallback(n=>{try{localStorage.setItem(SK,JSON.stringify(n));}catch{}},[]);
+  const update=useCallback(fn=>{
+    setS(prev=>{
+      const next=fn({...prev});
+      const nb=chkBadges(next);
+      if(nb.length){
+        next.unlockedBadges=[...(next.unlockedBadges||[]),...nb];
+        next.newBadges=[...(next.newBadges||[]),...nb];
+        nb.forEach(bid=>{const b=BADGES.find(x=>x.id===bid);if(b)setTimeout(()=>showT(`🏅 Badge : ${b.name} !`,C.gold,3500),800);});
+      }
+      persist(next);return next;
+    });
+  },[persist]);
+
+  const sp=(x,y)=>{const ps=Array.from({length:10},(_,i)=>({id:Date.now()+i,x,y,dx:(Math.random()-.5)*100,dy:-(Math.random()*90+30),color:[C.violet,C.gold,C.emerald,C.fuchsia,C.sky][Math.floor(Math.random()*5)]}));setParts(ps);setTimeout(()=>setParts([]),900);};
+  const showT=(msg,color=C.emerald,dur=2500)=>{setToast({msg,color});setTimeout(()=>setToast(null),dur);};
+
+  if(!loaded)return<div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}><div style={{fontSize:40}}>⚔️</div><div style={{color:C.violet,fontFamily:"monospace",fontSize:14,letterSpacing:3,animation:"pulse 1.5s infinite"}}>CHARGEMENT...</div></div>;
+
+  const lvl=getLvl(s.xp),rank=getRank(lvl.lvl);
+  const cs={};
+  Object.keys(CATS).forEach(cat=>{
+    const all=[...CORE.filter(h=>h.cat===cat),...BONUS.filter(h=>h.cat===cat)];
+    if(!all.length){cs[cat]=0;return;}
+    const tot=all.reduce((a,h)=>{
+      if(h.unit==="check")return a+pct(Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length,h.goal);
+      if(h.id==="sleep")return a+pct(calcSleep(s.sleepBedtime,s.sleepWake),SG);
+      const pg=BONUS.find(b=>b.id===h.id)?(s.bonusProgress?.[h.id]||0):(s.coreProgress?.[h.id]||0);
+      return a+pct(pg,h.goal);
+    },0);
+    cs[cat]=Math.round(tot/all.length);
+  });
+  const gs=Math.round(Object.values(cs).reduce((a,b)=>a+b,0)/Object.keys(CATS).length);
+  const cc=isCoreOk(s);
+
+  return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,overflowX:"hidden"}}>
+    {parts.map(p=><div key={p.id} style={{position:"fixed",left:p.x,top:p.y,width:8,height:8,borderRadius:"50%",background:p.color,pointerEvents:"none",zIndex:9998,animation:"particle .8s ease forwards","--dx":p.dx+"px","--dy":p.dy+"px"}}/>)}
+    {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#000",fontWeight:800,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 40px ${toast.color}66`,whiteSpace:"nowrap",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>{toast.msg}</div>}
+
+    {/* Header */}
+    <div style={{background:"linear-gradient(135deg,#0f0a1e 0%,#0a1020 100%)",borderBottom:`1px solid ${C.border}`,padding:"12px 16px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:16}}>{rank.icon}</span><span style={{fontSize:11,color:rank.color,fontWeight:700,letterSpacing:1}}>{rank.name}</span></div>
+          <div style={{fontSize:24,fontWeight:900,letterSpacing:-1,marginTop:2}}>Niv. <span style={{color:C.violet}}>{lvl.lvl}</span>{s.currentStreak>=3&&<span style={{fontSize:13,color:C.amber,marginLeft:8}}>🔥 {s.currentStreak}</span>}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:26,fontWeight:900,color:C.gold,letterSpacing:-1}}>{s.xp.toLocaleString()}<span style={{fontSize:11,color:C.sub,fontWeight:400}}> XP</span></div>
+          <div style={{fontSize:10,color:C.sub}}>{Math.round(lvl.rem)}/{lvl.needed} → niv.{lvl.lvl+1}</div>
+        </div>
+      </div>
+      <div style={{marginTop:8,height:5,background:C.dim,borderRadius:8,overflow:"hidden",position:"relative"}}>
+        <div style={{position:"absolute",top:0,left:0,height:"100%",width:`${lvl.pct}%`,background:`linear-gradient(90deg,${C.purple},${C.lavender})`,borderRadius:8,transition:"width .6s ease",boxShadow:`0 0 8px ${C.violet}`}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
+        <span style={{fontSize:11,color:C.sub}}>Score du jour</span>
+        <span style={{fontSize:12,fontWeight:800,color:gs>=80?C.emerald:gs>=50?C.gold:C.rose}}>{gs}%</span>
+      </div>
+      {s.debt>0&&<div style={{marginTop:6,background:"rgba(225,29,72,0.1)",border:`1px solid ${C.red}40`,borderRadius:8,padding:"5px 10px",fontSize:11,color:C.rose,fontWeight:600}}>⚠️ {s.debt} dette{s.debt>1?"s":""} — récompenses bloquées</div>}
+      {s.newBadges?.length>0&&<div onClick={()=>{update(p=>({...p,newBadges:[]}));setTab("profile");}} style={{marginTop:6,background:`${C.gold}18`,border:`1px solid ${C.gold}60`,borderRadius:8,padding:"5px 10px",fontSize:11,color:C.gold,fontWeight:700,cursor:"pointer"}}>🏅 {s.newBadges.length} badge{s.newBadges.length>1?"s":""} débloqué{s.newBadges.length>1?"s":""} ! Voir le profil →</div>}
+    </div>
+
+    {/* Content */}
+    <div style={{padding:"14px 14px 90px"}}>
+      {tab==="dashboard"&&<Dashboard s={s} cs={cs} gs={gs} lvl={lvl} rank={rank} update={update} showT={showT} cc={cc}/>}
+      {tab==="habits"&&<Habits s={s} update={update} showT={showT} sp={sp}/>}
+      {tab==="epic"&&<Epic s={s} update={update} showT={showT}/>}
+      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank}/>}
+      {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} update={update} showT={showT}/>}
+      {tab==="journal"&&<Journal s={s} update={update} showT={showT}/>}
+      {tab==="settings"&&<Settings s={s} update={update} showT={showT}/>}
+    </div>
+
+    {/* Nav */}
+    <nav style={{position:"fixed",bottom:0,left:0,right:0,background:`${C.surface}f0`,backdropFilter:"blur(12px)",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-around",padding:"6px 0 16px"}}>
+      {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"none",border:"none",cursor:"pointer",padding:"4px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,color:tab===t.id?C.violet:C.sub,transition:"all .2s",transform:tab===t.id?"translateY(-2px)":"none",position:"relative"}}>
+        <span style={{fontSize:15}}>{t.icon}</span>
+        <span style={{fontSize:8,fontWeight:700,letterSpacing:.3,textTransform:"uppercase"}}>{t.label}</span>
+        {tab===t.id&&<div style={{position:"absolute",bottom:-6,width:20,height:2,background:C.violet,borderRadius:2}}/>}
+        {t.id==="profile"&&s.newBadges?.length>0&&<div style={{position:"absolute",top:0,right:2,width:8,height:8,background:C.gold,borderRadius:"50%"}}/>}
+        {t.id==="journal"&&s.debt>0&&<div style={{position:"absolute",top:0,right:2,width:8,height:8,background:C.rose,borderRadius:"50%"}}/>}
+      </button>)}
+    </nav>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
