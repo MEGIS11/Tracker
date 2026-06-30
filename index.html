@@ -162,6 +162,7 @@ const CATS={
   cerveau:{label:"Cerveau",icon:"🧠",color:C.sky},
   apparence:{label:"Apparence",icon:"✨",color:C.amber},
   discipline:{label:"Discipline",icon:"🎯",color:C.fuchsia},
+  social:{label:"Social",icon:"🤝",color:C.orange},
 };
 
 const TABS=[
@@ -185,7 +186,7 @@ const mkDef=()=>({
   epicProgress:{},epicQuests:EQ_DEF,
   debt:0,conscience:[],
   activities:[],
-  activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0},
+  activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0},
   eveningDone:false,eveningNote:{good:"",improve:""},
   claimedPalier:[],unlockedBadges:[],newBadges:[],
   gymTotal:0,waterDays:0,onepieceTotal:0,proteinDays:0,veggieDays:0,
@@ -249,6 +250,7 @@ const ImpactPill=({cat,val})=>{
 function analyzeActivity(text){
   return new Promise(resolve=>{
     const t=text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const Z={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
 
     // Extract duration in minutes
     let mins=0;
@@ -263,66 +265,115 @@ function analyzeActivity(text){
     // Duration multiplier: base is 30min
     const mul=Math.min(mins/30, 6); // cap at 6x (3h)
 
+    // Late-night detection
+    const lateNight=/\b(tard|nuit|minuit|3h|2h|1h du mat|insomnie)\b/.test(t);
+
+    // === SPECIAL CASE: Video games (nuanced by game type + duration + time of day) ===
+    const competitiveGames=["fortnite","cod","call of duty","warzone","apex","valorant","lol","league of legends","overwatch","pubg"];
+    const casualMobileGames=["brawl stars","clash royale","clash of clans","candy crush","subway surfer","mobile legends"];
+    const gamingWords=["jeux video","jeux vidéo","gaming","gamer","ps5","ps4","xbox","switch","console","jouer a","jouer à","fifa","minecraft","roblox"];
+    const isGaming=gamingWords.some(w=>t.includes(w))||competitiveGames.some(w=>t.includes(w))||casualMobileGames.some(w=>t.includes(w));
+    if(isGaming){
+      const isCompetitive=competitiveGames.some(w=>t.includes(w));
+      const isCasualMobile=casualMobileGames.some(w=>t.includes(w));
+      // base impact per 30 min — casual mobile games are mild, competitive console games hit harder
+      let base=isCasualMobile?-2:isCompetitive?-6:-4;
+      // duration makes it worse non-linearly for gaming specifically
+      const gameMul=Math.min(Math.pow(mins/30,1.3),8);
+      let discipline=base*gameMul;
+      let corps=Math.min(0,-1*gameMul*0.4);
+      let cerveau=isCasualMobile?0:Math.min(0,-1*gameMul*0.3);
+      if(lateNight){discipline*=1.6;corps*=1.8;}
+      resolve({
+        corps:Math.round(Math.max(-20,corps)),
+        nutrition:0,
+        cerveau:Math.round(Math.max(-20,cerveau)),
+        apparence:0,
+        discipline:Math.round(Math.max(-20,discipline)),
+        social:isCasualMobile?0:Math.round(Math.max(-10,-1*gameMul*0.2)),
+      });
+      return;
+    }
+
+    // === SPECIAL CASE: Pornography (always strongly negative) ===
+    const pornWords=["porno","porn","pornographie","pornographique"];
+    if(pornWords.some(w=>t.includes(w))){
+      const m=Math.min(mins/15,8); // even short sessions count meaningfully
+      resolve({
+        corps:Math.round(Math.max(-20,-6*m)),
+        nutrition:0,
+        cerveau:Math.round(Math.max(-20,-7*m)),
+        apparence:0,
+        discipline:Math.round(Math.max(-20,-9*m)),
+        social:Math.round(Math.max(-15,-3*m)),
+      });
+      return;
+    }
+
     // Activity database: {keywords[], impacts per 30min}
     const DB=[
       // === SPORT & CORPS ===
-      {k:["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche"],i:{corps:12,nutrition:0,cerveau:1,apparence:3,discipline:8}},
-      {k:["course","courir","jogging","sprint","cardio","run"],i:{corps:11,nutrition:0,cerveau:2,apparence:2,discipline:7}},
-      {k:["foot","football","futsal","match"],i:{corps:10,nutrition:0,cerveau:3,apparence:1,discipline:6}},
-      {k:["basket","basketball","tennis","badminton","sport","ping","pong","natation","nager","velo","cyclisme","boxe","mma","judo","karate","sport"],i:{corps:9,nutrition:0,cerveau:2,apparence:1,discipline:6}},
-      {k:["marche","marcher","balade","balader","promenade","promener"],i:{corps:5,nutrition:0,cerveau:3,apparence:0,discipline:3}},
-      {k:["randonnee","randonner","foret","montagne","nature","hiking"],i:{corps:7,nutrition:0,cerveau:5,apparence:0,discipline:4}},
-      {k:["etirement","etirer","stretching","yoga","souplesse","mobilite"],i:{corps:5,nutrition:0,cerveau:2,apparence:1,discipline:5}},
-      {k:["sieste","dormi","dors","sommeil"],i:{corps:4,nutrition:0,cerveau:3,apparence:2,discipline:-1}},
-      {k:["danse","danser"],i:{corps:8,nutrition:0,cerveau:2,apparence:3,discipline:4}},
+      {k:["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche"],i:{...Z,corps:12,cerveau:1,apparence:3,discipline:8}},
+      {k:["course","courir","jogging","sprint","cardio","run"],i:{...Z,corps:11,cerveau:2,apparence:2,discipline:7}},
+      {k:["foot","football","futsal","match"],i:{...Z,corps:10,cerveau:3,apparence:1,discipline:6,social:5}},
+      {k:["basket","basketball","tennis","badminton","ping","pong","natation","nager","velo","cyclisme","boxe","mma","judo","karate","sport"],i:{...Z,corps:9,cerveau:2,apparence:1,discipline:6}},
+      {k:["marche","marcher","balade","balader","promenade","promener"],i:{...Z,corps:5,cerveau:3,discipline:3}},
+      {k:["randonnee","randonner","foret","montagne","nature","hiking"],i:{...Z,corps:7,cerveau:5,discipline:4}},
+      {k:["etirement","etirer","stretching","yoga","souplesse","mobilite"],i:{...Z,corps:5,cerveau:2,apparence:1,discipline:5}},
+      {k:["sieste","dormi","dors","sommeil"],i:{...Z,corps:4,cerveau:3,apparence:2,discipline:-1}},
+      {k:["danse","danser"],i:{...Z,corps:8,cerveau:2,apparence:3,discipline:4,social:4}},
 
       // === NUTRITION ===
-      {k:["cuisine","cuisiné","prépare","repas","fait a manger","cook"],i:{corps:2,nutrition:8,cerveau:3,apparence:1,discipline:6}},
-      {k:["legume","legumes","salade","brocoli","carotte","epinard","courgette","tomate","concombre","poivron"],i:{corps:2,nutrition:10,cerveau:0,apparence:3,discipline:3}},
-      {k:["fruit","pomme","banane","orange","fraise","myrtille","mangue","kiwi","raisin"],i:{corps:2,nutrition:9,cerveau:0,apparence:3,discipline:2}},
-      {k:["proteine","poulet","dinde","boeuf","poisson","saumon","thon","oeuf","fromage blanc","yaourt","shake"],i:{corps:3,nutrition:9,cerveau:0,apparence:2,discipline:3}},
-      {k:["pizza","burger","fast food","mcdo","kebab","frite","chips","nuggets"],i:{corps:-4,nutrition:-8,cerveau:0,apparence:-3,discipline:-5}},
-      {k:["sucre","bonbon","gateau","chocolat","glace","dessert","viennoiserie"],i:{corps:-2,nutrition:-6,cerveau:0,apparence:-2,discipline:-4}},
-      {k:["alcool","biere","vin","cocktail","boire"],i:{corps:-5,nutrition:-7,cerveau:-4,apparence:-3,discipline:-6}},
-      {k:["eau","hydrat"],i:{corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2}},
+      {k:["cuisine","cuisiné","prépare","repas","fait a manger","cook"],i:{...Z,corps:2,nutrition:8,cerveau:3,apparence:1,discipline:6}},
+      {k:["legume","legumes","salade","brocoli","carotte","epinard","courgette","tomate","concombre","poivron"],i:{...Z,corps:2,nutrition:10,apparence:3,discipline:3}},
+      {k:["fruit","pomme","banane","orange","fraise","myrtille","mangue","kiwi","raisin"],i:{...Z,corps:2,nutrition:9,apparence:3,discipline:2}},
+      {k:["proteine","poulet","dinde","boeuf","poisson","saumon","thon","oeuf","fromage blanc","yaourt","shake"],i:{...Z,corps:3,nutrition:9,apparence:2,discipline:3}},
+      {k:["pizza","burger","fast food","mcdo","kebab","frite","chips","nuggets"],i:{...Z,corps:-4,nutrition:-8,apparence:-3,discipline:-5}},
+      {k:["sucre","bonbon","gateau","chocolat","glace","dessert","viennoiserie"],i:{...Z,corps:-2,nutrition:-6,apparence:-2,discipline:-4}},
+      {k:["alcool","biere","vin","cocktail","boire"],i:{...Z,corps:-5,nutrition:-7,cerveau:-4,apparence:-3,discipline:-6}},
+      {k:["eau","hydrat"],i:{...Z,corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2}},
 
       // === CERVEAU ===
-      {k:["livre","lire","lu","lecture","roman","bouquin"],i:{corps:0,nutrition:0,cerveau:10,apparence:0,discipline:6}},
-      {k:["echecs","chess","jeu de reflexion","sudoku","puzzle","enigme"],i:{corps:0,nutrition:0,cerveau:10,cerveau:10,apparence:0,discipline:6}},
-      {k:["japonais","kanji","hiragana","katakana","duolingo","langue","apprendre"],i:{corps:0,nutrition:0,cerveau:11,apparence:0,discipline:7}},
-      {k:["documentaire","docu","reportage"],i:{corps:0,nutrition:0,cerveau:8,apparence:0,discipline:3}},
-      {k:["podcast","conference","ted","cours en ligne","mooc","formation"],i:{corps:0,nutrition:0,cerveau:8,apparence:0,discipline:5}},
-      {k:["dessin","dessiner","sketch","croquis","illustrer","illustré","aquarelle","peinture","peindre"],i:{corps:0,nutrition:0,cerveau:7,apparence:2,discipline:5}},
-      {k:["coder","programmer","code","dev","développer","javascript","python","html"],i:{corps:0,nutrition:0,cerveau:11,apparence:0,discipline:7}},
-      {k:["ecrire","rediger","journal","blog","dissertation"],i:{corps:0,nutrition:0,cerveau:8,apparence:0,discipline:5}},
-      {k:["music","musique","guitare","piano","instrument","jouer de"],i:{corps:0,nutrition:0,cerveau:7,apparence:1,discipline:6}},
-      {k:["meditation","mediter","pleine conscience","mindfulness","respiration"],i:{corps:2,nutrition:0,cerveau:7,apparence:0,discipline:8}},
-      {k:["prier","priere","spirituel"],i:{corps:0,nutrition:0,cerveau:4,apparence:0,discipline:5}},
-      {k:["géographie","histoire","science","biologie","physique","chimie","maths","revise","révision"],i:{corps:0,nutrition:0,cerveau:9,apparence:0,discipline:7}},
+      {k:["livre","lire","lu","lecture","roman","bouquin"],i:{...Z,cerveau:10,discipline:6}},
+      {k:["echecs","chess","jeu de reflexion","sudoku","puzzle","enigme"],i:{...Z,cerveau:10,discipline:6}},
+      {k:["japonais","kanji","hiragana","katakana","duolingo","langue","apprendre"],i:{...Z,cerveau:11,discipline:7}},
+      {k:["documentaire","docu","reportage"],i:{...Z,cerveau:8,discipline:3}},
+      {k:["podcast","conference","ted","cours en ligne","mooc","formation"],i:{...Z,cerveau:8,discipline:5}},
+      {k:["dessin","dessiner","sketch","croquis","illustrer","illustré","aquarelle","peinture","peindre"],i:{...Z,cerveau:7,apparence:2,discipline:5}},
+      {k:["coder","programmer","code","dev","développer","javascript","python","html"],i:{...Z,cerveau:11,discipline:7}},
+      {k:["ecrire","rediger","journal","blog","dissertation"],i:{...Z,cerveau:8,discipline:5}},
+      {k:["music","musique","guitare","piano","instrument","jouer de"],i:{...Z,cerveau:7,apparence:1,discipline:6}},
+      {k:["meditation","mediter","pleine conscience","mindfulness","respiration"],i:{...Z,corps:2,cerveau:7,discipline:8}},
+      {k:["prier","priere","spirituel"],i:{...Z,cerveau:4,discipline:5}},
+      {k:["géographie","histoire","science","biologie","physique","chimie","maths","revise","révision"],i:{...Z,cerveau:9,discipline:7}},
 
       // === APPARENCE / STYLE ===
-      {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{corps:0,nutrition:0,cerveau:1,apparence:7,discipline:2}},
-      {k:["coiffeur","coupe","cheveux"],i:{corps:0,nutrition:0,cerveau:0,apparence:8,discipline:2}},
-      {k:["soin","skincare","creme","masque visage","nettoyant"],i:{corps:1,nutrition:0,cerveau:0,apparence:9,discipline:4}},
-      {k:["rasage","raser","rasé"],i:{corps:0,nutrition:0,cerveau:0,apparence:6,discipline:3}},
-      {k:["parfum","cologne"],i:{corps:0,nutrition:0,cerveau:0,apparence:5,discipline:2}},
-      {k:["douche","bain","laver"],i:{corps:2,nutrition:0,cerveau:0,apparence:7,discipline:3}},
+      {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{...Z,cerveau:1,apparence:7,discipline:2}},
+      {k:["coiffeur","coupe","cheveux"],i:{...Z,apparence:8,discipline:2}},
+      {k:["soin","skincare","creme","masque visage","nettoyant"],i:{...Z,corps:1,apparence:9,discipline:4}},
+      {k:["rasage","raser","rasé"],i:{...Z,apparence:6,discipline:3}},
+      {k:["parfum","cologne"],i:{...Z,apparence:5,discipline:2}},
+      {k:["douche","bain","laver"],i:{...Z,corps:2,apparence:7,discipline:3}},
 
       // === DISCIPLINE / PRODUCTIVITE ===
-      {k:["ranger","nettoyé","nettoyage","ménage","aspirateur","vaisselle","chambre"],i:{corps:1,nutrition:0,cerveau:1,apparence:2,discipline:7}},
-      {k:["planifier","planning","organisation","organiser","objectif","agenda","todo"],i:{corps:0,nutrition:0,cerveau:4,apparence:0,discipline:9}},
-      {k:["reveil","lever","debout","matin"],i:{corps:1,nutrition:0,cerveau:1,apparence:0,discipline:7}},
-      {k:["travail","bosser","boulot","stage","job"],i:{corps:0,nutrition:0,cerveau:5,apparence:0,discipline:8}},
-      {k:["famille","parent","frere","soeur","ami","sortie","social","parle","discute"],i:{corps:0,nutrition:0,cerveau:4,apparence:2,discipline:2}},
-      {k:["voyage","visite","musee","expo","culture","tourisme"],i:{corps:2,nutrition:0,cerveau:7,apparence:1,discipline:3}},
+      {k:["ranger","nettoyé","nettoyage","ménage","aspirateur","vaisselle","chambre"],i:{...Z,corps:1,cerveau:1,apparence:2,discipline:7}},
+      {k:["planifier","planning","organisation","organiser","objectif","agenda","todo"],i:{...Z,cerveau:4,discipline:9}},
+      {k:["reveil","lever","debout","matin"],i:{...Z,corps:1,cerveau:1,discipline:7}},
+      {k:["travail","bosser","boulot","stage","job"],i:{...Z,cerveau:5,discipline:8}},
+
+      // === SOCIAL ===
+      {k:["famille","parent","frere","soeur","grand-mere","grand-pere","cousin"],i:{...Z,cerveau:2,discipline:1,social:9}},
+      {k:["ami","amis","copain","copine","pote","sortie","soiree","quedal","resto","restaurant"],i:{...Z,cerveau:1,apparence:1,social:9}},
+      {k:["parle","discute","appel","appelé","conversation","retrouve"],i:{...Z,cerveau:2,social:7}},
+      {k:["date","rdv amoureux","rendez-vous","rencard"],i:{...Z,apparence:3,social:9}},
+      {k:["voyage","visite","musee","expo","culture","tourisme"],i:{...Z,corps:2,cerveau:7,apparence:1,discipline:3,social:3}},
 
       // === ACTIVITES NEGATIVES ===
-      {k:["scroll","scroller","instagram","tiktok","snapchat","twitter","x","reseaux","réseaux","feed","explore"],i:{corps:-2,nutrition:0,cerveau:-5,apparence:-1,discipline:-8}},
-      {k:["netflix","serie","film","youtube","video","watch","regardé","regarder"],i:{corps:-1,nutrition:0,cerveau:-2,apparence:0,discipline:-4}},
-      {k:["jeux video","jeux vidéo","gaming","gamer","ps5","xbox","pc","fortnite","fifa","cod","lol","valorant","minecraft"],i:{corps:-1,nutrition:0,cerveau:2,apparence:0,discipline:-5}},
-      {k:["fumer","cigarette","clope","tabac","weed","cannabis","joint"],i:{corps:-8,nutrition:-3,cerveau:-3,apparence:-4,discipline:-6}},
-      {k:["paresse","glander","glande","rien","trainé","trainer","procrastine","procrastination"],i:{corps:-3,nutrition:0,cerveau:-4,apparence:-1,discipline:-9}},
-      {k:["dormi trop","oversleep","grasse matinee","grasse matinée"],i:{corps:-1,nutrition:0,cerveau:-2,apparence:-1,discipline:-6}},
+      {k:["scroll","scroller","instagram","tiktok","snapchat","twitter","x ","reseaux","réseaux","feed","explore"],i:{...Z,corps:-3,cerveau:-8,apparence:-1,discipline:-12,social:-3}},
+      {k:["netflix","serie","film","youtube","video","watch","regardé","regarder"],i:{...Z,corps:-1,cerveau:-2,discipline:-4}},
+      {k:["fumer","cigarette","clope","tabac","weed","cannabis","joint"],i:{...Z,corps:-8,nutrition:-3,cerveau:-3,apparence:-4,discipline:-6}},
+      {k:["paresse","glander","glande","rien","trainé","trainer","procrastine","procrastination"],i:{...Z,corps:-3,cerveau:-4,apparence:-1,discipline:-9}},
+      {k:["dormi trop","oversleep","grasse matinee","grasse matinée"],i:{...Z,corps:-1,cerveau:-2,apparence:-1,discipline:-6}},
     ];
 
     // Find matching activity
@@ -337,16 +388,15 @@ function analyzeActivity(text){
 
     if(!bestMatch){
       // Unknown activity — neutral with slight discipline bonus
-      resolve({corps:0,nutrition:0,cerveau:1,apparence:0,discipline:2});
+      resolve({...Z,cerveau:1,discipline:2});
       return;
     }
 
     // Apply duration multiplier and round
     const raw=bestMatch.i;
     const result={};
-    for(const k of Object.keys(raw)){
-      const v=raw[k]*mul;
-      // Cap values
+    for(const k of Object.keys(Z)){
+      const v=(raw[k]||0)*mul;
       result[k]=Math.round(Math.max(-20,Math.min(20,v)));
     }
     resolve(result);
@@ -680,16 +730,18 @@ function Journal({s,update,showT}){
   const[section,setSection]=useState("activities");
   const[input,setInput]=useState("");
   const[loading,setLoading]=useState(false);
+  const[editingId,setEditingId]=useState(null);
+  const[editVals,setEditVals]=useState({});
 
   const analyze=async()=>{
     if(!input.trim())return;
     setLoading(true);
     try{
       const impacts=await analyzeActivity(input.trim());
-      const activity={id:Date.now(),text:input.trim(),impacts,time:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
+      const activity={id:Date.now(),text:input.trim(),impacts,originalImpacts:impacts,adjusted:false,time:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
       update(p=>{
         const newActivities=[...(p.activities||[]),activity];
-        const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+        const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
         newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
         return{...p,activities:newActivities,activityImpacts:newImpacts};
       });
@@ -702,10 +754,33 @@ function Journal({s,update,showT}){
   const removeActivity=(id)=>{
     update(p=>{
       const newActivities=(p.activities||[]).filter(a=>a.id!==id);
-      const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+      const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
       newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
       return{...p,activities:newActivities,activityImpacts:newImpacts};
     });
+  };
+
+  const startEdit=(activity)=>{
+    setEditingId(activity.id);
+    setEditVals({...activity.impacts});
+  };
+
+  const cancelEdit=()=>{setEditingId(null);setEditVals({});};
+
+  const saveEdit=()=>{
+    update(p=>{
+      const newActivities=(p.activities||[]).map(a=>a.id===editingId?{...a,impacts:{...editVals},adjusted:true}:a);
+      const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
+      newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
+      return{...p,activities:newActivities,activityImpacts:newImpacts};
+    });
+    showT("Impact ajusté ✓",C.emerald);
+    setEditingId(null);setEditVals({});
+  };
+
+  const resetToOriginal=()=>{
+    const act=(s.activities||[]).find(a=>a.id===editingId);
+    if(act?.originalImpacts) setEditVals({...act.originalImpacts});
   };
 
   const addFault=f=>{update(p=>({...p,debt:p.debt+f.debt,conscience:[...(p.conscience||[]),{date:TODAY(),label:f.label,debt:f.debt}]}));showT(`+${f.debt} dette`,C.red);};
@@ -745,20 +820,43 @@ function Journal({s,update,showT}){
         <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
           {todayActs.map(a=>{
             const hasImpact=Object.values(a.impacts).some(v=>v!==0);
-            return<div key={a.id} style={{background:C.surface,borderRadius:12,padding:"10px 12px",border:`1px solid ${C.border}`}}>
+            const isEditing=editingId===a.id;
+            return<div key={a.id} style={{background:C.surface,borderRadius:12,padding:"10px 12px",border:`1px solid ${isEditing?C.sky:C.border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{a.text}</div>
-                  {hasImpact&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{a.text}{a.adjusted&&<span style={{fontSize:9,color:C.sky,marginLeft:6,fontWeight:700}}>AJUSTÉ</span>}</div>
+                  {!isEditing&&hasImpact&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                     {Object.entries(a.impacts).filter(([,v])=>v!==0).map(([k,v])=><ImpactPill key={k} cat={k} val={v}/>)}
                   </div>}
-                  {!hasImpact&&<span style={{fontSize:11,color:C.sub}}>Aucun impact significatif détecté</span>}
+                  {!isEditing&&!hasImpact&&<span style={{fontSize:11,color:C.sub}}>Aucun impact significatif détecté</span>}
                 </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
+                {!isEditing&&<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
                   <span style={{fontSize:10,color:C.sub}}>{a.time}</span>
                   <button onClick={()=>removeActivity(a.id)} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:16,padding:0,lineHeight:1}}>×</button>
-                </div>
+                </div>}
               </div>
+
+              {!isEditing&&<button onClick={()=>startEdit(a)} style={{marginTop:8,background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.sub,fontSize:11,cursor:"pointer",fontWeight:600}}>✏️ Ça ne me semble pas correct</button>}
+
+              {isEditing&&<div style={{marginTop:10,display:"flex",flexDirection:"column",gap:10}}>
+                <div style={{fontSize:11,color:C.sub}}>Ajuste l'impact pour chaque catégorie (-20 à +20) :</div>
+                {Object.entries(CATS).map(([k,cat])=>(
+                  <div key={k}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:12}}>{cat.icon} {cat.label}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:editVals[k]>0?C.emerald:editVals[k]<0?C.rose:C.sub}}>{editVals[k]>0?"+":""}{editVals[k]||0}</span>
+                    </div>
+                    <input type="range" min="-20" max="20" value={editVals[k]||0}
+                      onChange={e=>setEditVals(v=>({...v,[k]:parseInt(e.target.value)}))}
+                      style={{width:"100%",accentColor:cat.color}}/>
+                  </div>
+                ))}
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <Btn onClick={saveEdit} color={C.emerald} full>Enregistrer</Btn>
+                  <Btn onClick={resetToOriginal} color={C.muted} small>↺ Reset</Btn>
+                  <Btn onClick={cancelEdit} color={C.muted} small>Annuler</Btn>
+                </div>
+              </div>}
             </div>;
           })}
         </div>
@@ -816,7 +914,7 @@ function Journal({s,update,showT}){
 
 // ── SETTINGS ──
 function Settings({s,update,showT}){
-  const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},activities:[],activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
+  const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},activities:[],activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
   const ra=()=>{update(()=>mkDef());showT("Données effacées",C.red);};
   return<div style={{display:"flex",flexDirection:"column",gap:14}}>
     <div style={{fontSize:12,color:C.sub}}>⚠️ Zone sensible.</div>
@@ -862,12 +960,12 @@ function App(){
           p.coreProgress={};p.bonusProgress={};p.checklistProgress={};
           p.sleepBedtime=null;p.sleepWake=null;
           p.eveningDone=false;p.eveningNote={good:"",improve:""};
-          p.activities=[];p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+          p.activities=[];p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
           p.todayKey=TODAY();
           const nb=chkBadges(p);if(nb.length){p.unlockedBadges=[...(p.unlockedBadges||[]),...nb];p.newBadges=nb;}
         }
         if(!p.activities)p.activities=[];
-        if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0};
+        if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
         setS(p);
       }else setS(mkDef());
     }catch{setS(mkDef());}
