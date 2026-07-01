@@ -29,11 +29,19 @@ button:active{opacity:.75;transform:scale(.97);}
 @keyframes rotateSlowRev{to{transform:rotate(-360deg)}}
 @keyframes bounceIn{0%{transform:scale(0) rotate(-15deg);opacity:0}55%{transform:scale(1.15) rotate(5deg);opacity:1}75%{transform:scale(.92) rotate(-2deg)}100%{transform:scale(1) rotate(0deg)}}
 @keyframes fadeInBg{from{opacity:0}to{opacity:1}}
+@keyframes fadeOutBg{from{opacity:1}to{opacity:0}}
+@keyframes screenShake{0%,100%{transform:translate(0,0)}10%{transform:translate(-4px,2px)}20%{transform:translate(4px,-2px)}30%{transform:translate(-3px,-2px)}40%{transform:translate(3px,2px)}50%{transform:translate(-2px,1px)}60%{transform:translate(2px,-1px)}70%{transform:translate(-1px,1px)}80%{transform:translate(1px,-1px)}90%{transform:translate(-1px,0)}}
+@keyframes modalIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes modalOut{from{opacity:1;transform:scale(1) translateY(0)}to{opacity:0;transform:scale(.96) translateY(6px)}}
+@keyframes parallaxDrift{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @keyframes textPop{0%{transform:scale(0.5);opacity:0}60%{transform:scale(1.1);opacity:1}100%{transform:scale(1)}}
 @keyframes confettiFall{to{transform:translateY(420px) rotate(var(--rot));opacity:0}}
 @keyframes rayPulse{0%,100%{opacity:.5}50%{opacity:1}}
 @keyframes badgeShine{0%{left:-150%}35%{left:150%}100%{left:150%}}
 @keyframes segPop{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes tabFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes barShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -55,6 +63,13 @@ const C={
 
 const SK="amaury-quest-v4";
 const TODAY=()=>new Date().toISOString().slice(0,10);
+const getWeekKey=()=>{
+  const d=new Date();
+  const day=d.getDay()===0?7:d.getDay(); // Monday=1..Sunday=7
+  const monday=new Date(d);
+  monday.setDate(d.getDate()-(day-1));
+  return monday.toISOString().slice(0,10);
+};
 
 const RANKS=[
   {min:1,max:2,icon:"🥚",name:"L'Œuf Cosmique",color:"#94a3b8"},
@@ -204,6 +219,9 @@ const mkDef=()=>({
   meditationStreak:0,readingStreak:0,tidyStreak:0,
   nocturneStreak:0,conscienceCleanStreak:0,proteinStreak:0,veggieStreak:0,
   history:[],
+  records:{bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0},
+  weeklyChallenge:null, // {weekKey, cat, habitId, goal, current, xpReward, done, claimed}
+  dailyXPGained:0, dailyXPDate:null,
 });
 
 const isCoreOk=s=>CORE.every(h=>{
@@ -211,6 +229,47 @@ const isCoreOk=s=>CORE.every(h=>{
   if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
   return(s.coreProgress?.[h.id]||0)>=h.goal;
 });
+
+const CAT_ORDER=["corps","nutrition","cerveau","apparence","discipline","social"];
+
+const CHALLENGE_TEMPLATES={
+  corps:[
+    {id:"gym3",label:"3 séances de gym cette semaine",habitId:"gym",target:3,xp:120,icon:"🏋️"},
+    {id:"water7",label:"Hydratation complète 5 jours sur 7",habitId:"water",target:5,xp:100,icon:"💧"},
+    {id:"sleep5",label:"5 nuits de sommeil complet",habitId:"sleep",target:5,xp:110,icon:"😴"},
+  ],
+  nutrition:[
+    {id:"protein5",label:"Objectif protéines atteint 5 jours",habitId:"protein",target:5,xp:110,icon:"🥩"},
+    {id:"veg5",label:"5 fruits & légumes, 5 jours sur 7",habitId:"veggies",target:5,xp:100,icon:"🥦"},
+  ],
+  cerveau:[
+    {id:"jap5",label:"Japonais 5 jours cette semaine",habitId:"japanese",target:5,xp:120,icon:"🎌"},
+    {id:"read4",label:"Lecture 4 jours cette semaine",habitId:"reading",target:4,xp:90,icon:"📚"},
+  ],
+  apparence:[
+    {id:"groom5",label:"Routine apparence complète 5 jours",habitId:"grooming",target:5,xp:100,icon:"✨"},
+  ],
+  discipline:[
+    {id:"med5",label:"Méditation 5 jours cette semaine",habitId:"meditation",target:5,xp:100,icon:"🧘"},
+    {id:"wake5",label:"Lever avant 8h30, 5 jours sur 7",habitId:"wakeup",target:5,xp:110,icon:"🌅"},
+    {id:"clean7",label:"7 jours sans dette conscience",habitId:"__debtfree",target:7,xp:150,icon:"🙏"},
+  ],
+};
+
+function generateWeeklyChallenge(){
+  const weekKey=getWeekKey();
+  const d=new Date();
+  const weekNum=Math.floor((d-new Date(d.getFullYear(),0,1))/(7*86400000));
+  const cat=CAT_ORDER[weekNum%CAT_ORDER.length];
+  const templates=CHALLENGE_TEMPLATES[cat]||CHALLENGE_TEMPLATES.discipline;
+  const chosen=templates[weekNum%templates.length];
+  return{
+    weekKey,cat,
+    id:chosen.id,label:chosen.label,habitId:chosen.habitId,
+    goal:chosen.target,current:0,xpReward:chosen.xp,icon:chosen.icon,
+    done:false,claimed:false,
+  };
+}
 
 const computeGlobalScore=s=>{
   const cs={};
@@ -268,7 +327,14 @@ const Crd=({children,style={},accent})=><div style={{
   position:"relative",
   ...style
 }}>{children}</div>;
-const Br=({val,max,color,h=7,glow})=>{const p=Math.min((val/max)*100,100);return<div style={{background:C.dim,borderRadius:8,height:h,overflow:"hidden"}}><div style={{height:"100%",width:`${p}%`,background:color,borderRadius:8,transition:"width .5s ease",boxShadow:glow?`0 0 8px ${color}88`:"none"}}/></div>;};
+const Br=({val,max,color,h=7,glow})=>{
+  const p=Math.min((val/max)*100,100);
+  return<div style={{background:C.dim,borderRadius:8,height:h,overflow:"hidden"}}>
+    <div style={{height:"100%",width:`${p}%`,background:color,borderRadius:8,transition:"width .6s cubic-bezier(.22,.61,.36,1)",boxShadow:glow?`0 0 8px ${color}88`:"none",position:"relative",overflow:"hidden"}}>
+      {p>0&&<div style={{position:"absolute",top:0,left:0,height:"100%",width:"40%",background:"linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",animation:"barShimmer 2.2s ease-in-out infinite"}}/>}
+    </div>
+  </div>;
+};
 const SegBar=({pct,color,segments=16,h=8})=>{
   const filled=Math.floor((pct/100)*segments);
   const partial=((pct/100)*segments)-filled;
@@ -283,6 +349,30 @@ const SegBar=({pct,color,segments=16,h=8})=>{
   </div>;
 };
 const Lbl=({children})=><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.sub,textTransform:"uppercase"}}>{children}</div>;
+function CountUp({value,duration=700,decimals=0,suffix=""}){
+  const[display,setDisplay]=useState(value);
+  const prevRef=useRef(value);
+  const rafRef=useRef(null);
+  useEffect(()=>{
+    const from=prevRef.current;
+    const to=value;
+    if(from===to){setDisplay(to);return;}
+    const start=performance.now();
+    const ease=t=>1-Math.pow(1-t,3); // ease-out cubic, smooth & premium
+    const tick=now=>{
+      const t=Math.min(1,(now-start)/duration);
+      const eased=ease(t);
+      const current=from+(to-from)*eased;
+      setDisplay(current);
+      if(t<1) rafRef.current=requestAnimationFrame(tick);
+      else{setDisplay(to);prevRef.current=to;}
+    };
+    rafRef.current=requestAnimationFrame(tick);
+    return()=>{if(rafRef.current)cancelAnimationFrame(rafRef.current);};
+  },[value,duration]);
+  const shown=decimals>0?display.toFixed(decimals):Math.round(display).toLocaleString();
+  return<>{shown}{suffix}</>;
+}
 const Btn=({children,onClick,color,full,small})=>{
   const dk=[C.gold,C.emerald,C.amber,C.green].includes(color);
   return<button onClick={onClick} className="btn3d" style={{
@@ -295,7 +385,7 @@ const Btn=({children,onClick,color,full,small})=>{
     transition:"transform .1s ease, box-shadow .1s ease",
   }}>{children}</button>;
 };
-const MStat=({icon,val,label,color})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18}}>{icon}</div><div style={{fontSize:22,fontWeight:900,color,marginTop:2}}>{val}</div><div style={{fontSize:10,color:C.sub,marginTop:1}}>{label}</div></div>;
+const MStat=({icon,val,label,color})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18}}>{icon}</div><div style={{fontSize:22,fontWeight:900,color,marginTop:2}}>{typeof val==="number"?<CountUp value={val}/>:val}</div><div style={{fontSize:10,color:C.sub,marginTop:1}}>{label}</div></div>;
 const iS={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13};
 const tS={...iS,width:"100%",resize:"none",fontFamily:"inherit"};
 
@@ -467,6 +557,40 @@ function analyzeActivity(text){
 }
 
 // ── DASHBOARD ──
+// ── WEEKLY CHALLENGE CARD ──
+function WeeklyChallengeCard({wc,update,showT}){
+  const cat=CATS[wc.cat]||CATS.discipline;
+  const p2=pct(wc.current,wc.goal);
+  const claim=()=>{
+    update(p=>({...p,xp:p.xp+wc.xpReward,weeklyChallenge:{...p.weeklyChallenge,claimed:true}}));
+    showT(`🏆 +${wc.xpReward} XP réclamés !`,C.gold,3000);
+  };
+  return<div style={{
+    background:`linear-gradient(135deg, ${cat.color}22, ${C.card2})`,
+    border:`1.5px solid ${cat.color}55`,borderRadius:18,padding:16,
+    boxShadow:`0 4px 0 ${cat.color}33, 0 8px 20px -6px ${cat.color}40`,
+    position:"relative",overflow:"hidden"
+  }}>
+    {wc.done&&!wc.claimed&&<div style={{position:"absolute",top:0,left:"-150%",width:"60%",height:"100%",background:`linear-gradient(115deg, transparent, ${cat.color}44, transparent)`,animation:"badgeShine 3s ease-in-out infinite"}}/>}
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",position:"relative"}}>
+      <div>
+        <div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:cat.color,textTransform:"uppercase"}}>⚡ Défi de la semaine · {cat.label}</div>
+        <div style={{fontSize:15,fontWeight:700,marginTop:6}}>{wc.icon} {wc.label}</div>
+      </div>
+      <div style={{fontSize:11,fontWeight:800,color:C.gold,flexShrink:0,marginLeft:8}}>+{wc.xpReward}XP</div>
+    </div>
+    <div style={{marginTop:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:C.sub,marginBottom:4}}>
+        <span>{wc.current}/{wc.goal}</span>
+        <span>{wc.done?"Complété !":`${p2}%`}</span>
+      </div>
+      <Br val={wc.current} max={wc.goal} color={cat.color} glow={wc.done}/>
+    </div>
+    {wc.done&&!wc.claimed&&<div style={{marginTop:12}}><Btn onClick={claim} color={C.gold} full>🎁 Réclamer +{wc.xpReward} XP</Btn></div>}
+    {wc.claimed&&<div style={{marginTop:10,color:C.emerald,fontWeight:700,fontSize:12,textAlign:"center"}}>✓ Récompense réclamée</div>}
+  </div>;
+}
+
 function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
   const[eo,setEo]=useState(false);
   const[good,setGood]=useState(s.eveningNote?.good||"");
@@ -479,7 +603,10 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
     return(s.coreProgress?.[h.id]||0)>=h.goal;
   }).length;
 
-  return<div style={{display:"flex",flexDirection:"column",gap:14,animation:"slideUp .3s ease"}}>
+  return<div style={{display:"flex",flexDirection:"column",gap:14,}}>
+    {/* Weekly challenge */}
+    {s.weeklyChallenge&&<WeeklyChallengeCard wc={s.weeklyChallenge} update={update} showT={showT}/>}
+
     {/* Japan countdown */}
     <div style={{background:"linear-gradient(135deg,#0d1117,#1a0a2e)",border:`1px solid ${C.purple}40`,borderRadius:16,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
       <div><div style={{fontSize:11,color:C.sub,letterSpacing:2,textTransform:"uppercase"}}>Départ pour le Japon</div><div style={{fontSize:13,color:C.text,marginTop:2}}>11 juillet 2026</div></div>
@@ -489,7 +616,7 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
     {/* Global score */}
     <Crd>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
-        <div><Lbl>SCORE DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:gs>=80?C.emerald:gs>=50?C.gold:C.rose,lineHeight:1.1,marginTop:4}}>{gs}%</div></div>
+        <div><Lbl>SCORE DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:gs>=80?C.emerald:gs>=50?C.gold:C.rose,lineHeight:1.1,marginTop:4}}><CountUp value={gs} suffix="%"/></div></div>
         <div style={{textAlign:"right"}}>{cc&&<div style={{color:C.emerald,fontWeight:700,fontSize:12}}>🏆 Journée parfaite !</div>}<div style={{fontSize:11,color:C.sub,marginTop:4}}>{cnt}/{CORE.length} core</div></div>
       </div>
       <Br val={gs} max={100} color={gs>=80?C.emerald:gs>=50?C.gold:C.violet} glow/>
@@ -529,7 +656,7 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
         <div><Lbl>BILAN DU SOIR</Lbl><div style={{fontSize:11,color:C.sub,marginTop:3}}>5 min pour ancrer ta journée</div></div>
         {s.eveningDone?<span style={{color:C.emerald,fontWeight:700,fontSize:13}}>✓ Fait</span>:<Btn onClick={()=>setEo(!eo)} color={C.purple}>Remplir</Btn>}
       </div>
-      {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+      {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10,animation:"modalIn .3s cubic-bezier(.22,.61,.36,1)",transformOrigin:"top center"}}>
         <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>✅ Une chose bien faite aujourd'hui</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ex: j'ai fait ma séance sans me forcer..."/></div>
         <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🔧 Une chose à améliorer demain</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Ex: j'ai trop scrollé après 22h..."/></div>
         <Btn onClick={save} color={C.emerald} full>Enregistrer</Btn>
@@ -579,7 +706,14 @@ function Habits({s,update,showT,sp}){
         if(id==="protein"){ex.proteinDays=(p.proteinDays||0)+1;ex.proteinStreak=(p.proteinStreak||0)+1;}
         if(id==="veggies"){ex.veggieDays=(p.veggieDays||0)+1;ex.veggieStreak=(p.veggieStreak||0)+1;}
         setTimeout(()=>showT(`${h.icon} ${h.label} ✓ +${xg}XP${bon?` 🔥×${st}`:""}`,C.violet),10);
-        return{...p,[key]:{...p[key],[id]:nxt},xp:p.xp+xg,streaks:{...p.streaks,[id]:st},...ex};
+        let wc=p.weeklyChallenge;
+        if(wc&&wc.habitId===id&&!wc.done){
+          const newCur=wc.current+1;
+          const nowDone=newCur>=wc.goal;
+          wc={...wc,current:newCur,done:nowDone};
+          if(nowDone)setTimeout(()=>showT(`🏆 Défi de la semaine complété ! Va réclamer ta récompense`,C.gold,4000),1200);
+        }
+        return{...p,[key]:{...p[key],[id]:nxt},xp:p.xp+xg,streaks:{...p.streaks,[id]:st},weeklyChallenge:wc,...ex};
       }
       return{...p,[key]:{...p[key],[id]:nxt}};
     });
@@ -593,7 +727,13 @@ function Habits({s,update,showT,sp}){
       const wasD=Object.values(cur).filter(Boolean).length>=4,nowD=done>=4;
       const xg=(!wasD&&nowD)?30:0;
       if(!wasD&&nowD)setTimeout(()=>showT("✨ Routine apparence ✓ +30XP",C.amber),10);
-      return{...p,checklistProgress:{grooming:nxt},xp:p.xp+xg,groomingStreak:(!wasD&&nowD)?(p.groomingStreak||0)+1:p.groomingStreak};
+      let wc=p.weeklyChallenge;
+      if(!wasD&&nowD&&wc&&wc.habitId==="grooming"&&!wc.done){
+        const newCur=wc.current+1,nowDone2=newCur>=wc.goal;
+        wc={...wc,current:newCur,done:nowDone2};
+        if(nowDone2)setTimeout(()=>showT("🏆 Défi de la semaine complété !",C.gold,4000),1200);
+      }
+      return{...p,checklistProgress:{grooming:nxt},xp:p.xp+xg,groomingStreak:(!wasD&&nowD)?(p.groomingStreak||0)+1:p.groomingStreak,weeklyChallenge:wc};
     });
   };
 
@@ -601,15 +741,22 @@ function Habits({s,update,showT,sp}){
     const nb={...p,[f]:v};const sh=calcSleep(nb.sleepBedtime,nb.sleepWake);
     if(sh>=SG&&calcSleep(p.sleepBedtime,p.sleepWake)<SG){
       setTimeout(()=>showT("😴 Sommeil atteint ! +35XP",C.purple),10);
-      return{...nb,xp:p.xp+35,sleepStreak:(p.sleepStreak||0)+1};
+      let wc=p.weeklyChallenge;
+      if(wc&&wc.habitId==="sleep"&&!wc.done){
+        const newCur=wc.current+1,nowDone=newCur>=wc.goal;
+        wc={...wc,current:newCur,done:nowDone};
+        if(nowDone)setTimeout(()=>showT("🏆 Défi de la semaine complété !",C.gold,4000),1200);
+      }
+      return{...nb,xp:p.xp+35,sleepStreak:(p.sleepStreak||0)+1,weeklyChallenge:wc};
     }
     return nb;
   });
 
-  const rH=(h,isB=false)=>{
+  const rH=(h,isB=false,idx=0)=>{
+    const stagger={animation:`cardIn .4s cubic-bezier(.22,.61,.36,1) ${idx*0.06}s both`};
     if(h.unit==="check"){
       const chks=s.checklistProgress?.grooming||{},done=Object.values(chks).filter(Boolean).length,cmp=done>=h.goal;
-      return<Crd key={h.id} style={{borderLeft:`3px solid ${cmp?C.emerald:h.color}`}}>
+      return<Crd key={h.id} style={{borderLeft:`3px solid ${cmp?C.emerald:h.color}`,...stagger}}>
         <HRow h={h} val={`${done}/${h.goal}`} complete={cmp} isBonus={isB}/>
         <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
           {h.checklist.map((item,i)=><button key={i} onClick={e=>togChk(i,e)} style={{background:chks[i]?"rgba(16,185,129,0.08)":C.surface,border:`1px solid ${chks[i]?C.emerald:C.border}`,borderRadius:10,padding:"9px 12px",cursor:"pointer",color:C.text,display:"flex",alignItems:"center",gap:10,fontSize:13}}>
@@ -620,7 +767,7 @@ function Habits({s,update,showT,sp}){
     }
     if(h.id==="sleep"){
       const sh=calcSleep(s.sleepBedtime,s.sleepWake),done=sh>=SG;
-      return<Crd key="sleep" style={{borderLeft:`3px solid ${done?C.emerald:C.purple}`}}>
+      return<Crd key="sleep" style={{borderLeft:`3px solid ${done?C.emerald:C.purple}`,...stagger}}>
         <HRow h={h} val={sh?`${sh}h`:"—"} complete={done} isBonus={false}/>
         <div style={{display:"flex",gap:10,marginTop:10}}>
           <div style={{flex:1}}><div style={{fontSize:10,color:C.sub,marginBottom:4}}>🌙 Coucher</div><input type="time" value={s.sleepBedtime||""} onChange={e=>setSl("sleepBedtime",e.target.value)} style={{...iS,width:"100%"}}/></div>
@@ -630,7 +777,7 @@ function Habits({s,update,showT,sp}){
       </Crd>;
     }
     const pk=isB?"bonusProgress":"coreProgress",cur=s[pk]?.[h.id]||0,done=cur>=h.goal;
-    return<Crd key={h.id} style={{borderLeft:`3px solid ${done?C.emerald:h.color}`}}>
+    return<Crd key={h.id} style={{borderLeft:`3px solid ${done?C.emerald:h.color}`,...stagger}}>
       <HRow h={h} val={h.unit==="bool"?(done?"✓":"—"):`${cur}${h.unit}`} complete={done} isBonus={isB}/>
       {h.unit!=="bool"&&<div style={{marginTop:8}}><Br val={cur} max={h.goal} color={done?C.emerald:h.color} glow={done}/></div>}
       {!done&&<div style={{display:"flex",gap:8,marginTop:10}}>
@@ -646,8 +793,8 @@ function Habits({s,update,showT,sp}){
       {["core","bonus"].map(v=><button key={v} onClick={()=>setView(v)} style={{background:view===v?C.purple:C.surface,color:view===v?"#fff":C.sub,border:`1px solid ${view===v?C.purple:C.border}`,borderRadius:20,padding:"7px 18px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{v==="core"?"Obligatoires":"✨ Bonus"}</button>)}
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:12}}>
-      {view==="core"&&CORE.map(h=>rH(h,false))}
-      {view==="bonus"&&<><div style={{fontSize:12,color:C.sub,padding:"0 2px"}}>XP bonus — ne bloquent pas les récompenses.</div>{BONUS.map(h=>rH(h,true))}</>}
+      {view==="core"&&CORE.map((h,i)=>rH(h,false,i))}
+      {view==="bonus"&&<><div style={{fontSize:12,color:C.sub,padding:"0 2px"}}>XP bonus — ne bloquent pas les récompenses.</div>{BONUS.map((h,i)=>rH(h,true,i))}</>}
     </div>
   </div>;
 }
@@ -672,9 +819,9 @@ function Epic({s,update,showT}){
   };
 
   return<div style={{display:"flex",flexDirection:"column",gap:14}}>
-    {s.epicQuests.map(q=>{
+    {s.epicQuests.map((q,qi)=>{
       const prog=s.epicProgress?.[q.id]||0,done=prog>=q.milestones.length;
-      return<Crd key={q.id} style={{background:done?"linear-gradient(135deg,#1a1200,#1a1a28)":C.card}}>
+      return<Crd key={q.id} style={{background:done?"linear-gradient(135deg,#1a1200,#1a1a28)":C.card,animation:`cardIn .4s cubic-bezier(.22,.61,.36,1) ${qi*0.07}s both`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
             <div style={{width:44,height:44,borderRadius:12,background:`${C.purple}20`,border:`1px solid ${C.purple}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{q.icon}</div>
@@ -694,7 +841,7 @@ function Epic({s,update,showT}){
     })}
     {!adding
       ?<button onClick={()=>setAdding(true)} style={{background:C.surface,border:`1px dashed ${C.muted}`,borderRadius:14,padding:16,color:C.sub,fontSize:13,cursor:"pointer",fontWeight:700}}>+ Ajouter une quête épique</button>
-      :<Crd><Lbl>NOUVELLE QUÊTE</Lbl><div style={{display:"flex",flexDirection:"column",gap:10,marginTop:10}}>
+      :<Crd style={{animation:"modalIn .3s cubic-bezier(.22,.61,.36,1)",transformOrigin:"top center"}}><Lbl>NOUVELLE QUÊTE</Lbl><div style={{display:"flex",flexDirection:"column",gap:10,marginTop:10}}>
         <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Nom de la quête" style={{...iS,width:"100%"}}/>
         <input value={ms} onChange={e=>setMs(e.target.value)} placeholder="Étapes séparées par des virgules" style={{...iS,width:"100%"}}/>
         <input value={xpv} onChange={e=>setXpv(e.target.value)} placeholder="XP total" type="number" style={{...iS,width:"100%"}}/>
@@ -706,9 +853,17 @@ function Epic({s,update,showT}){
 
 // ── PROFILE ──
 // ── HISTORY CHART ──
-function HistoryChart({s,gs}){
+function HistoryChart({s,gs,cs}){
   const[range,setRange]=useState(7);
+  const[cat,setCat]=useState("global");
   const hist=s.history||[];
+  const catColor=cat==="global"?C.violet:(CATS[cat]?.color||C.violet);
+
+  const getScoreFor=(entry,isToday)=>{
+    if(cat==="global")return isToday?gs:entry?.score??null;
+    if(isToday)return cs?.[cat]??null;
+    return entry?.cats?.[cat]??null;
+  };
 
   // Build the last N days including today
   const days=[];
@@ -716,15 +871,12 @@ function HistoryChart({s,gs}){
     const d=new Date();
     d.setDate(d.getDate()-i);
     const key=d.toISOString().slice(0,10);
-    if(key===TODAY()){
-      days.push({date:key,score:gs,isToday:true});
-    }else{
-      const found=hist.find(h=>h.date===key);
-      days.push({date:key,score:found?found.score:null,isToday:false});
-    }
+    const isToday=key===TODAY();
+    const found=hist.find(h=>h.date===key);
+    days.push({date:key,score:getScoreFor(found,isToday),isToday});
   }
 
-  const validDays=days.filter(d=>d.score!==null);
+  const validDays=days.filter(d=>d.score!==null&&d.score!==undefined);
   const avg=validDays.length?Math.round(validDays.reduce((a,d)=>a+d.score,0)/validDays.length):0;
   const w=280,h=100,pad=8;
   const stepX=validDays.length>1?(w-pad*2)/(validDays.length-1):0;
@@ -742,10 +894,14 @@ function HistoryChart({s,gs}){
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
       <Lbl>HISTORIQUE</Lbl>
       <div style={{display:"flex",gap:6}}>
-        {[7,30].map(r=><button key={r} onClick={()=>setRange(r)} style={{background:range===r?C.violet:C.surface,color:range===r?"#fff":C.sub,border:`1px solid ${range===r?C.violet:C.border}`,borderRadius:16,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{r}j</button>)}
+        {[7,30].map(r=><button key={r} onClick={()=>setRange(r)} style={{background:range===r?catColor:C.surface,color:range===r?"#fff":C.sub,border:`1px solid ${range===r?catColor:C.border}`,borderRadius:16,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{r}j</button>)}
       </div>
     </div>
-    <div style={{display:"flex",alignItems:"baseline",gap:8,margin:"8px 0 12px"}}>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
+      <button onClick={()=>setCat("global")} style={{background:cat==="global"?C.violet:C.surface,color:cat==="global"?"#fff":C.sub,border:`1px solid ${cat==="global"?C.violet:C.border}`,borderRadius:14,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>🌐 Global</button>
+      {Object.entries(CATS).map(([k,c])=><button key={k} onClick={()=>setCat(k)} style={{background:cat===k?c.color:C.surface,color:cat===k?"#fff":C.sub,border:`1px solid ${cat===k?c.color:C.border}`,borderRadius:14,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{c.icon} {c.label}</button>)}
+    </div>
+    <div style={{display:"flex",alignItems:"baseline",gap:8,margin:"10px 0 12px"}}>
       <span style={{fontSize:26,fontWeight:900,color:avg>=70?C.emerald:avg>=40?C.gold:C.rose}}>{avg}%</span>
       <span style={{fontSize:11,color:C.sub}}>moyenne sur {range} jours</span>
     </div>
@@ -753,15 +909,15 @@ function HistoryChart({s,gs}){
       <div style={{textAlign:"center",padding:"20px 10px",color:C.sub,fontSize:12}}>Pas encore assez d'historique — reviens demain pour voir ta courbe !</div>
       :<svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:100,overflow:"visible"}}>
         <defs>
-          <linearGradient id="histGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={C.violet} stopOpacity="0.35"/>
-            <stop offset="100%" stopColor={C.violet} stopOpacity="0"/>
+          <linearGradient id={`histGrad-${cat}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={catColor} stopOpacity="0.35"/>
+            <stop offset="100%" stopColor={catColor} stopOpacity="0"/>
           </linearGradient>
         </defs>
         {[0,50,100].map(v=>{const y=pad+(h-pad*2)*(1-v/100);return<line key={v} x1={pad} y1={y} x2={w-pad} y2={y} stroke={C.border} strokeWidth="1" strokeDasharray="2,3"/>;})}
-        {areaD&&<path d={areaD} fill="url(#histGrad)"/>}
-        {pathD&&<path d={pathD} fill="none" stroke={C.violet} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
-        {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={p.isToday?4:2.5} fill={p.isToday?C.gold:C.violet} stroke={C.bg} strokeWidth="1.5"/>)}
+        {areaD&&<path d={areaD} fill={`url(#histGrad-${cat})`}/>}
+        {pathD&&<path d={pathD} fill="none" stroke={catColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+        {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={p.isToday?4:2.5} fill={p.isToday?C.gold:catColor} stroke={C.bg} strokeWidth="1.5"/>)}
       </svg>
     }
     {validDays.length>=2&&<div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:9,color:C.sub}}>
@@ -771,13 +927,36 @@ function HistoryChart({s,gs}){
   </Crd>;
 }
 
-function Profile({s,lvl,rank,gs}){
+// ── RECORDS CARD ──
+function RecordsCard({s}){
+  const r=s.records||{bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0};
+  const items=[
+    {icon:"🔥",label:"Meilleur streak",val:r.bestStreak,suffix:" jours",color:C.amber},
+    {icon:"📈",label:"Meilleure semaine",val:r.bestWeekAvg,suffix:"%",color:C.emerald},
+    {icon:"⚡",label:"Plus gros gain XP (1j)",val:r.bestDayXP,suffix:" XP",color:C.gold},
+    {icon:"🏆",label:"Meilleur score (1j)",val:r.bestDayScore,suffix:"%",color:C.violet},
+  ];
+  return<Crd>
+    <Lbl>🏆 RECORDS PERSONNELS</Lbl>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+      {items.map(it=>(
+        <div key={it.label} style={{background:C.surface,borderRadius:12,padding:"12px 10px",border:`1px solid ${C.border}`,textAlign:"center"}}>
+          <div style={{fontSize:18}}>{it.icon}</div>
+          <div style={{fontSize:20,fontWeight:900,color:it.color,marginTop:4}}><CountUp value={it.val}/>{it.suffix}</div>
+          <div style={{fontSize:10,color:C.sub,marginTop:2}}>{it.label}</div>
+        </div>
+      ))}
+    </div>
+  </Crd>;
+}
+
+function Profile({s,lvl,rank,gs,cs}){
   const ul=s.unlockedBadges||[];
   const[filter,setFilter]=useState("all");
   const cats=["all","Corps","Cerveau","Nutrition","Style","Discipline","Légendaire"];
   const filtered=filter==="all"?BADGES:BADGES.filter(b=>b.cat===filter);
 
-  return<div style={{display:"flex",flexDirection:"column",gap:14,animation:"slideUp .3s ease"}}>
+  return<div style={{display:"flex",flexDirection:"column",gap:14,}}>
     {/* Player card */}
     <div style={{background:"linear-gradient(135deg,#0d0a20 0%,#1a0d35 50%,#0a1520 100%)",border:`1px solid ${rank.color}40`,borderRadius:20,padding:20,position:"relative",overflow:"hidden",boxShadow:`0 0 30px ${rank.color}22`}}>
       <div style={{position:"absolute",top:-20,right:-20,fontSize:80,opacity:.06}}>{rank.icon}</div>
@@ -788,7 +967,7 @@ function Profile({s,lvl,rank,gs}){
           <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}><span style={{fontSize:18}}>{rank.icon}</span><span style={{fontSize:13,fontWeight:700,color:rank.color}}>{rank.name}</span></div>
         </div>
         <div style={{textAlign:"right"}}>
-          <div style={{fontSize:22,fontWeight:900,color:C.gold}}>{s.xp.toLocaleString()}</div>
+          <div style={{fontSize:22,fontWeight:900,color:C.gold}}><CountUp value={s.xp}/></div>
           <div style={{fontSize:10,color:C.sub}}>XP total</div>
           <div style={{marginTop:8,fontSize:14,fontWeight:700,color:C.amber}}>🔥 {s.currentStreak} jours</div>
         </div>
@@ -804,7 +983,10 @@ function Profile({s,lvl,rank,gs}){
     </div>
 
     {/* History chart */}
-    <HistoryChart s={s} gs={gs}/>
+    <HistoryChart s={s} gs={gs} cs={cs}/>
+
+    {/* Personal records */}
+    <RecordsCard s={s}/>
 
     {/* Badges */}
     <Crd>
@@ -922,7 +1104,7 @@ function Journal({s,update,showT}){
   const todayActs=(s.activities||[]);
   const todayFaults=(s.conscience||[]).filter(e=>e.date===TODAY());
 
-  return<div style={{display:"flex",flexDirection:"column",gap:14,animation:"slideUp .3s ease"}}>
+  return<div style={{display:"flex",flexDirection:"column",gap:14,}}>
 
     {/* Section tabs */}
     <div style={{display:"flex",gap:8}}>
@@ -971,7 +1153,7 @@ function Journal({s,update,showT}){
 
               {!isEditing&&<button onClick={()=>startEdit(a)} style={{marginTop:8,background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.sub,fontSize:11,cursor:"pointer",fontWeight:600}}>✏️ Ça ne me semble pas correct</button>}
 
-              {isEditing&&<div style={{marginTop:10,display:"flex",flexDirection:"column",gap:10}}>
+              {isEditing&&<div style={{marginTop:10,display:"flex",flexDirection:"column",gap:10,animation:"modalIn .3s cubic-bezier(.22,.61,.36,1)",transformOrigin:"top center"}}>
                 <div style={{fontSize:11,color:C.sub}}>Ajuste l'impact pour chaque catégorie (-20 à +20) :</div>
                 {Object.entries(CATS).map(([k,cat])=>(
                   <div key={k}>
@@ -1048,7 +1230,7 @@ function Journal({s,update,showT}){
 // ── SETTINGS ──
 function Settings({s,update,showT}){
   const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},activities:[],activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
-  const ra=()=>{update(()=>mkDef());showT("Données effacées",C.red);};
+  const ra=()=>{update(()=>({...mkDef(),weeklyChallenge:generateWeeklyChallenge()}));showT("Données effacées",C.red);};
   return<div style={{display:"flex",flexDirection:"column",gap:14}}>
     <div style={{fontSize:12,color:C.sub}}>⚠️ Zone sensible.</div>
     <Crd style={{border:`1px solid ${C.red}40`}}>
@@ -1074,30 +1256,39 @@ function Settings({s,update,showT}){
 
 // ── LEVEL UP OVERLAY ──
 function LevelUpOverlay({data,onClose}){
-  if(!data)return null;
-  const{lvl,rank}=data;
+  const[closing,setClosing]=useState(false);
+  const[shownData,setShownData]=useState(null);
+  useEffect(()=>{
+    if(data){setShownData(data);setClosing(false);}
+  },[data]);
+  if(!shownData)return null;
+  const handleClose=()=>{
+    setClosing(true);
+    setTimeout(()=>{onClose();setShownData(null);},280);
+  };
+  const{lvl,rank}=shownData;
   const confetti=Array.from({length:24},(_,i)=>({
     id:i,left:Math.random()*100,delay:Math.random()*0.6,dur:1.4+Math.random()*1,
     rot:(Math.random()>0.5?1:-1)*(360+Math.random()*360),
     color:[C.violet,C.gold,C.emerald,C.fuchsia,C.sky,C.rose][Math.floor(Math.random()*6)],
     size:5+Math.random()*5,
   }));
-  return<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(5,5,12,0.88)",backdropFilter:"blur(6px)",zIndex:10000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",animation:"fadeInBg .3s ease",cursor:"pointer",overflow:"hidden"}}>
+  return<div onClick={handleClose} style={{position:"fixed",inset:0,background:"rgba(5,5,12,0.88)",backdropFilter:"blur(6px)",zIndex:10000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",animation:closing?"fadeOutBg .28s ease both":"fadeInBg .3s ease",cursor:"pointer",overflow:"hidden"}}>
     {/* Confetti */}
-    {confetti.map(c=><div key={c.id} style={{position:"absolute",top:-20,left:`${c.left}%`,width:c.size,height:c.size*1.6,background:c.color,borderRadius:2,animation:`confettiFall ${c.dur}s ease-in ${c.delay}s forwards`,"--rot":`${c.rot}deg`}}/>)}
+    {!closing&&confetti.map(c=><div key={c.id} style={{position:"absolute",top:-20,left:`${c.left}%`,width:c.size,height:c.size*1.6,background:c.color,borderRadius:2,animation:`confettiFall ${c.dur}s ease-in ${c.delay}s forwards`,"--rot":`${c.rot}deg`}}/>)}
 
     {/* Rotating light rays behind badge */}
-    <div style={{position:"relative",width:220,height:220,display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <div style={{position:"relative",width:220,height:220,display:"flex",alignItems:"center",justifyContent:"center",animation:closing?"modalOut .28s ease both":"none"}}>
       <div style={{position:"absolute",width:220,height:220,background:`conic-gradient(from 0deg, transparent, ${rank.color}33, transparent, ${rank.color}33, transparent)`,borderRadius:"50%",animation:"rotateSlow 6s linear infinite"}}/>
       <div style={{position:"absolute",width:170,height:170,background:`conic-gradient(from 45deg, transparent, ${rank.color}22, transparent)`,borderRadius:"50%",animation:"rotateSlowRev 8s linear infinite"}}/>
       <div style={{position:"absolute",width:150,height:150,borderRadius:"50%",background:`radial-gradient(circle, ${rank.color}30, transparent 70%)`,animation:"rayPulse 2s ease-in-out infinite"}}/>
       {/* Badge icon */}
-      <div style={{position:"relative",width:120,height:120,borderRadius:"50%",background:`linear-gradient(135deg, ${C.card2}, ${C.surface})`,border:`3px solid ${rank.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,boxShadow:`0 0 40px ${rank.color}88, inset 0 0 20px ${rank.color}33`,animation:"bounceIn .6s cubic-bezier(.34,1.56,.64,1)"}}>
+      <div style={{position:"relative",width:120,height:120,borderRadius:"50%",background:`linear-gradient(135deg, ${C.card2}, ${C.surface})`,border:`3px solid ${rank.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,boxShadow:`0 0 40px ${rank.color}88, inset 0 0 20px ${rank.color}33`,animation:closing?"none":"bounceIn .6s cubic-bezier(.34,1.56,.64,1)"}}>
         {rank.icon}
       </div>
     </div>
 
-    <div style={{marginTop:24,textAlign:"center",animation:"textPop .5s ease .3s both"}}>
+    <div style={{marginTop:24,textAlign:"center",animation:closing?"modalOut .28s ease both":"textPop .5s ease .3s both"}}>
       <div style={{fontSize:13,color:C.gold,fontWeight:800,letterSpacing:3,textTransform:"uppercase"}}>Niveau supérieur !</div>
       <div style={{fontSize:52,fontWeight:900,color:C.text,letterSpacing:-2,marginTop:4,textShadow:`0 0 30px ${rank.color}66`}}>NIV. {lvl}</div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:10}}>
@@ -1106,7 +1297,7 @@ function LevelUpOverlay({data,onClose}){
       </div>
     </div>
 
-    <div style={{marginTop:32,fontSize:12,color:C.sub,animation:"textPop .5s ease .5s both"}}>Touche l'écran pour continuer</div>
+    <div style={{marginTop:32,fontSize:12,color:C.sub,animation:closing?"modalOut .28s ease both":"textPop .5s ease .5s both"}}>Touche l'écran pour continuer</div>
   </div>;
 }
 
@@ -1118,6 +1309,7 @@ function App(){
   const[parts,setParts]=useState([]);
   const[loaded,setLoaded]=useState(false);
   const[levelUp,setLevelUp]=useState(null);
+  const[shake,setShake]=useState(false);
   const prevLvlRef=useRef(null);
 
   useEffect(()=>{
@@ -1127,13 +1319,42 @@ function App(){
         const p=JSON.parse(raw);
         if(p.todayKey!==TODAY()){
           const ok=isCoreOk(p);
-          const{gs:dayScore}=computeGlobalScore(p);
+          const{gs:dayScore,cs:dayCats}=computeGlobalScore(p);
           const hist=(p.history||[]).filter(h=>h.date!==p.todayKey);
-          hist.push({date:p.todayKey,score:dayScore,perfect:ok});
+          hist.push({date:p.todayKey,score:dayScore,perfect:ok,cats:dayCats});
           p.history=hist.slice(-90); // keep last 90 days max
           if(ok){p.perfectDays=(p.perfectDays||0)+1;p.currentStreak=(p.currentStreak||0)+1;const cs=p.currentStreak;if(cs%7===0)p.xp=(p.xp||0)+100;else if(cs%3===0)p.xp=(p.xp||0)+50;}
           else p.currentStreak=0;
           if(p.debt===0)p.conscienceCleanStreak=(p.conscienceCleanStreak||0)+1;else p.conscienceCleanStreak=0;
+
+          // debt-free weekly challenge progress
+          if(p.weeklyChallenge&&p.weeklyChallenge.habitId==="__debtfree"&&!p.weeklyChallenge.done){
+            if(p.debt===0){
+              const newCur=p.weeklyChallenge.current+1;
+              p.weeklyChallenge={...p.weeklyChallenge,current:newCur,done:newCur>=p.weeklyChallenge.goal};
+            }else{
+              p.weeklyChallenge={...p.weeklyChallenge,current:0};
+            }
+          }
+
+          // Update personal records
+          if(!p.records)p.records={bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0};
+          if(p.currentStreak>p.records.bestStreak)p.records.bestStreak=p.currentStreak;
+          if(dayScore>p.records.bestDayScore)p.records.bestDayScore=dayScore;
+          if((p.dailyXPGained||0)>p.records.bestDayXP)p.records.bestDayXP=p.dailyXPGained||0;
+          const last7=p.history.slice(-7);
+          if(last7.length===7){
+            const weekAvg=Math.round(last7.reduce((a,d)=>a+d.score,0)/7);
+            if(weekAvg>p.records.bestWeekAvg)p.records.bestWeekAvg=weekAvg;
+          }
+          p.dailyXPGained=0;
+
+          // Weekly challenge: new week? generate fresh challenge
+          const wk=getWeekKey();
+          if(!p.weeklyChallenge||p.weeklyChallenge.weekKey!==wk){
+            p.weeklyChallenge=generateWeeklyChallenge();
+          }
+
           p.coreProgress={};p.bonusProgress={};p.checklistProgress={};
           p.sleepBedtime=null;p.sleepWake=null;
           p.eveningDone=false;p.eveningNote={good:"",improve:""};
@@ -1144,22 +1365,41 @@ function App(){
         if(!p.activities)p.activities=[];
         if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
         if(!p.history)p.history=[];
+        if(!p.records)p.records={bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0};
+        if(!p.weeklyChallenge||p.weeklyChallenge.weekKey!==getWeekKey())p.weeklyChallenge=generateWeeklyChallenge();
+        if(p.dailyXPGained===undefined)p.dailyXPGained=0;
         prevLvlRef.current=getLvl(p.xp).lvl;
         setS(p);
-      }else{setS(mkDef());prevLvlRef.current=1;}
+      }else{const d=mkDef();d.weeklyChallenge=generateWeeklyChallenge();setS(d);prevLvlRef.current=1;}
     }catch{setS(mkDef());}
     setLoaded(true);
   },[]);
 
   const persist=useCallback(n=>{try{localStorage.setItem(SK,JSON.stringify(n));}catch{}},[]);
+  const triggerShake=useCallback(()=>{
+    setShake(true);
+    setTimeout(()=>setShake(false),500);
+  },[]);
+
   const update=useCallback(fn=>{
     setS(prev=>{
       const next=fn({...prev});
+      const xpDelta=Math.max(0,(next.xp||0)-(prev.xp||0));
+      if(xpDelta>0){
+        next.dailyXPGained=(prev.dailyXPDate===TODAY()?(prev.dailyXPGained||0):0)+xpDelta;
+        next.dailyXPDate=TODAY();
+      }
       const nb=chkBadges(next);
       if(nb.length){
         next.unlockedBadges=[...(next.unlockedBadges||[]),...nb];
         next.newBadges=[...(next.newBadges||[]),...nb];
         nb.forEach(bid=>{const b=BADGES.find(x=>x.id===bid);if(b)setTimeout(()=>showT(`🏅 Badge : ${b.name} !`,C.gold,3500),800);});
+        setTimeout(triggerShake,750);
+      }
+      const wasChallengeDone=prev.weeklyChallenge?.done;
+      const nowChallengeDone=next.weeklyChallenge?.done;
+      if(!wasChallengeDone&&nowChallengeDone){
+        setTimeout(triggerShake,1150);
       }
       const newLvl=getLvl(next.xp).lvl;
       if(prevLvlRef.current!==null&&newLvl>prevLvlRef.current){
@@ -1169,7 +1409,7 @@ function App(){
       prevLvlRef.current=newLvl;
       persist(next);return next;
     });
-  },[persist]);
+  },[persist,triggerShake]);
 
   const sp=(x,y)=>{const ps=Array.from({length:10},(_,i)=>({id:Date.now()+i,x,y,dx:(Math.random()-.5)*100,dy:-(Math.random()*90+30),color:[C.violet,C.gold,C.emerald,C.fuchsia,C.sky][Math.floor(Math.random()*5)]}));setParts(ps);setTimeout(()=>setParts([]),900);};
   const showT=(msg,color=C.emerald,dur=2500)=>{setToast({msg,color});setTimeout(()=>setToast(null),dur);};
@@ -1180,7 +1420,11 @@ function App(){
   const{cs,gs}=computeGlobalScore(s);
   const cc=isCoreOk(s);
 
-  return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,overflowX:"hidden"}}>
+  return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,overflowX:"hidden",animation:shake?"screenShake .5s ease":"none",position:"relative"}}>
+    {/* Ambient parallax depth layers */}
+    <div style={{position:"fixed",top:"-10%",left:"-15%",width:"60%",height:"40%",background:`radial-gradient(circle, ${rank.color}14, transparent 70%)`,pointerEvents:"none",zIndex:0,animation:"parallaxDrift 14s ease-in-out infinite",filter:"blur(20px)"}}/>
+    <div style={{position:"fixed",bottom:"-5%",right:"-10%",width:"55%",height:"35%",background:`radial-gradient(circle, ${C.purple}10, transparent 70%)`,pointerEvents:"none",zIndex:0,animation:"parallaxDrift 18s ease-in-out infinite reverse",filter:"blur(24px)"}}/>
+    <div style={{position:"relative",zIndex:1}}>
     {parts.map(p=><div key={p.id} style={{position:"fixed",left:p.x,top:p.y,width:8,height:8,borderRadius:"50%",background:p.color,pointerEvents:"none",zIndex:9998,animation:"particle .8s ease forwards","--dx":p.dx+"px","--dy":p.dy+"px"}}/>)}
     {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#000",fontWeight:800,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 40px ${toast.color}66`,whiteSpace:"nowrap",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>{toast.msg}</div>}
     <LevelUpOverlay data={levelUp} onClose={()=>setLevelUp(null)}/>
@@ -1193,7 +1437,7 @@ function App(){
           <div style={{fontSize:24,fontWeight:900,letterSpacing:-1,marginTop:2}}>Niv. <span style={{color:C.violet}}>{lvl.lvl}</span>{s.currentStreak>=3&&<span style={{fontSize:13,color:C.amber,marginLeft:8}}>🔥 {s.currentStreak}</span>}</div>
         </div>
         <div style={{textAlign:"right"}}>
-          <div style={{fontSize:26,fontWeight:900,color:C.gold,letterSpacing:-1}}>{s.xp.toLocaleString()}<span style={{fontSize:11,color:C.sub,fontWeight:400}}> XP</span></div>
+          <div style={{fontSize:26,fontWeight:900,color:C.gold,letterSpacing:-1}}><CountUp value={s.xp}/><span style={{fontSize:11,color:C.sub,fontWeight:400}}> XP</span></div>
           <div style={{fontSize:10,color:C.sub}}>{Math.round(lvl.rem)}/{lvl.needed} → niv.{lvl.lvl+1}</div>
         </div>
       </div>
@@ -1209,11 +1453,11 @@ function App(){
     </div>
 
     {/* Content */}
-    <div style={{padding:"14px 14px 90px"}}>
+    <div key={tab} style={{padding:"14px 14px 90px",animation:"tabFade .35s cubic-bezier(.22,.61,.36,1)"}}>
       {tab==="dashboard"&&<Dashboard s={s} cs={cs} gs={gs} lvl={lvl} rank={rank} update={update} showT={showT} cc={cc}/>}
       {tab==="habits"&&<Habits s={s} update={update} showT={showT} sp={sp}/>}
       {tab==="epic"&&<Epic s={s} update={update} showT={showT}/>}
-      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank} gs={gs}/>}
+      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank} gs={gs} cs={cs}/>}
       {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} update={update} showT={showT}/>}
       {tab==="journal"&&<Journal s={s} update={update} showT={showT}/>}
       {tab==="settings"&&<Settings s={s} update={update} showT={showT}/>}
@@ -1229,6 +1473,7 @@ function App(){
         {t.id==="journal"&&s.debt>0&&<div style={{position:"absolute",top:0,right:2,width:8,height:8,background:C.rose,borderRadius:"50%"}}/>}
       </button>)}
     </nav>
+    </div>
   </div>;
 }
 
