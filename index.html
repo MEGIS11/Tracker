@@ -24,6 +24,13 @@ button:active{opacity:.75;transform:scale(.97);}
 @keyframes shimmer{0%,100%{opacity:.7}50%{opacity:1}}
 @keyframes particle{to{transform:translate(var(--dx),var(--dy));opacity:0}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes rotateSlow{to{transform:rotate(360deg)}}
+@keyframes rotateSlowRev{to{transform:rotate(-360deg)}}
+@keyframes bounceIn{0%{transform:scale(0) rotate(-15deg);opacity:0}55%{transform:scale(1.15) rotate(5deg);opacity:1}75%{transform:scale(.92) rotate(-2deg)}100%{transform:scale(1) rotate(0deg)}}
+@keyframes fadeInBg{from{opacity:0}to{opacity:1}}
+@keyframes textPop{0%{transform:scale(0.5);opacity:0}60%{transform:scale(1.1);opacity:1}100%{transform:scale(1)}}
+@keyframes confettiFall{to{transform:translateY(420px) rotate(var(--rot));opacity:0}}
+@keyframes rayPulse{0%,100%{opacity:.5}50%{opacity:1}}
 </style>
 </head>
 <body>
@@ -193,6 +200,7 @@ const mkDef=()=>({
   gymStreak:0,wakeupStreak:0,groomingStreak:0,sleepStreak:0,
   meditationStreak:0,readingStreak:0,tidyStreak:0,
   nocturneStreak:0,conscienceCleanStreak:0,proteinStreak:0,veggieStreak:0,
+  history:[],
 });
 
 const isCoreOk=s=>CORE.every(h=>{
@@ -200,6 +208,24 @@ const isCoreOk=s=>CORE.every(h=>{
   if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
   return(s.coreProgress?.[h.id]||0)>=h.goal;
 });
+
+const computeGlobalScore=s=>{
+  const cs={};
+  Object.keys(CATS).forEach(cat=>{
+    const all=[...CORE.filter(h=>h.cat===cat),...BONUS.filter(h=>h.cat===cat)];
+    if(!all.length){cs[cat]=0;return;}
+    const tot=all.reduce((a,h)=>{
+      if(h.unit==="check")return a+pct(Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length,h.goal);
+      if(h.id==="sleep")return a+pct(calcSleep(s.sleepBedtime,s.sleepWake),SG);
+      const pg=BONUS.find(b=>b.id===h.id)?(s.bonusProgress?.[h.id]||0):(s.coreProgress?.[h.id]||0);
+      return a+pct(pg,h.goal);
+    },0);
+    cs[cat]=Math.round(tot/all.length);
+  });
+  Object.keys(cs).forEach(k=>{cs[k]=Math.max(0,Math.min(100,cs[k]+(s.activityImpacts?.[k]||0)));});
+  const gs=Math.round(Object.values(cs).reduce((a,b)=>a+b,0)/Object.keys(CATS).length);
+  return{cs,gs};
+};
 
 const chkBadges=s=>{
   const r=[],has=id=>(s.unlockedBadges||[]).includes(id),c=(id,cond)=>{if(cond&&!has(id))r.push(id);};
@@ -437,9 +463,8 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
       <Lbl>PAR CATÉGORIE</Lbl>
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
         {Object.entries(CATS).map(([k,cat])=>{
-          const base=cs[k]||0;
           const bonus=s.activityImpacts?.[k]||0;
-          const total=Math.max(0,Math.min(100,base+bonus));
+          const total=cs[k]||0;
           return<div key={k} style={{background:C.surface,borderRadius:12,padding:"10px 12px",border:`1px solid ${C.border}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
               <span style={{fontSize:13,fontWeight:600}}>{cat.icon} {cat.label}</span>
@@ -643,7 +668,73 @@ function Epic({s,update,showT}){
 }
 
 // ── PROFILE ──
-function Profile({s,lvl,rank}){
+// ── HISTORY CHART ──
+function HistoryChart({s,gs}){
+  const[range,setRange]=useState(7);
+  const hist=s.history||[];
+
+  // Build the last N days including today
+  const days=[];
+  for(let i=range-1;i>=0;i--){
+    const d=new Date();
+    d.setDate(d.getDate()-i);
+    const key=d.toISOString().slice(0,10);
+    if(key===TODAY()){
+      days.push({date:key,score:gs,isToday:true});
+    }else{
+      const found=hist.find(h=>h.date===key);
+      days.push({date:key,score:found?found.score:null,isToday:false});
+    }
+  }
+
+  const validDays=days.filter(d=>d.score!==null);
+  const avg=validDays.length?Math.round(validDays.reduce((a,d)=>a+d.score,0)/validDays.length):0;
+  const w=280,h=100,pad=8;
+  const stepX=validDays.length>1?(w-pad*2)/(validDays.length-1):0;
+
+  const points=validDays.map((d,i)=>{
+    const x=pad+i*stepX;
+    const y=pad+(h-pad*2)*(1-d.score/100);
+    return{x,y,score:d.score,date:d.date,isToday:d.isToday};
+  });
+
+  const pathD=points.length>1?points.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" "):"";
+  const areaD=points.length>1?`${pathD} L${points[points.length-1].x},${h-pad} L${points[0].x},${h-pad} Z`:"";
+
+  return<Crd>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+      <Lbl>HISTORIQUE</Lbl>
+      <div style={{display:"flex",gap:6}}>
+        {[7,30].map(r=><button key={r} onClick={()=>setRange(r)} style={{background:range===r?C.violet:C.surface,color:range===r?"#fff":C.sub,border:`1px solid ${range===r?C.violet:C.border}`,borderRadius:16,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{r}j</button>)}
+      </div>
+    </div>
+    <div style={{display:"flex",alignItems:"baseline",gap:8,margin:"8px 0 12px"}}>
+      <span style={{fontSize:26,fontWeight:900,color:avg>=70?C.emerald:avg>=40?C.gold:C.rose}}>{avg}%</span>
+      <span style={{fontSize:11,color:C.sub}}>moyenne sur {range} jours</span>
+    </div>
+    {validDays.length<2?
+      <div style={{textAlign:"center",padding:"20px 10px",color:C.sub,fontSize:12}}>Pas encore assez d'historique — reviens demain pour voir ta courbe !</div>
+      :<svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:100,overflow:"visible"}}>
+        <defs>
+          <linearGradient id="histGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.violet} stopOpacity="0.35"/>
+            <stop offset="100%" stopColor={C.violet} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {[0,50,100].map(v=>{const y=pad+(h-pad*2)*(1-v/100);return<line key={v} x1={pad} y1={y} x2={w-pad} y2={y} stroke={C.border} strokeWidth="1" strokeDasharray="2,3"/>;})}
+        {areaD&&<path d={areaD} fill="url(#histGrad)"/>}
+        {pathD&&<path d={pathD} fill="none" stroke={C.violet} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+        {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={p.isToday?4:2.5} fill={p.isToday?C.gold:C.violet} stroke={C.bg} strokeWidth="1.5"/>)}
+      </svg>
+    }
+    {validDays.length>=2&&<div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:9,color:C.sub}}>
+      <span>{new Date(validDays[0].date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}</span>
+      <span>Aujourd'hui</span>
+    </div>}
+  </Crd>;
+}
+
+function Profile({s,lvl,rank,gs}){
   const ul=s.unlockedBadges||[];
   const[filter,setFilter]=useState("all");
   const cats=["all","Corps","Cerveau","Nutrition","Style","Discipline","Légendaire"];
@@ -674,6 +765,9 @@ function Profile({s,lvl,rank}){
       </div>
       {lvl.lvl<50&&(()=>{const nx=RANKS.find(r=>r.min>lvl.lvl);return nx?<div style={{marginTop:12,padding:"8px 12px",background:"rgba(255,255,255,0.04)",borderRadius:10,fontSize:12,color:C.sub}}>Prochain rang : <span style={{color:nx.color,fontWeight:700}}>{nx.icon} {nx.name}</span> au niv.{nx.min}</div>:null;})()}
     </div>
+
+    {/* History chart */}
+    <HistoryChart s={s} gs={gs}/>
 
     {/* Badges */}
     <Crd>
@@ -939,6 +1033,44 @@ function Settings({s,update,showT}){
   </div>;
 }
 
+// ── LEVEL UP OVERLAY ──
+function LevelUpOverlay({data,onClose}){
+  if(!data)return null;
+  const{lvl,rank}=data;
+  const confetti=Array.from({length:24},(_,i)=>({
+    id:i,left:Math.random()*100,delay:Math.random()*0.6,dur:1.4+Math.random()*1,
+    rot:(Math.random()>0.5?1:-1)*(360+Math.random()*360),
+    color:[C.violet,C.gold,C.emerald,C.fuchsia,C.sky,C.rose][Math.floor(Math.random()*6)],
+    size:5+Math.random()*5,
+  }));
+  return<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(5,5,12,0.88)",backdropFilter:"blur(6px)",zIndex:10000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",animation:"fadeInBg .3s ease",cursor:"pointer",overflow:"hidden"}}>
+    {/* Confetti */}
+    {confetti.map(c=><div key={c.id} style={{position:"absolute",top:-20,left:`${c.left}%`,width:c.size,height:c.size*1.6,background:c.color,borderRadius:2,animation:`confettiFall ${c.dur}s ease-in ${c.delay}s forwards`,"--rot":`${c.rot}deg`}}/>)}
+
+    {/* Rotating light rays behind badge */}
+    <div style={{position:"relative",width:220,height:220,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{position:"absolute",width:220,height:220,background:`conic-gradient(from 0deg, transparent, ${rank.color}33, transparent, ${rank.color}33, transparent)`,borderRadius:"50%",animation:"rotateSlow 6s linear infinite"}}/>
+      <div style={{position:"absolute",width:170,height:170,background:`conic-gradient(from 45deg, transparent, ${rank.color}22, transparent)`,borderRadius:"50%",animation:"rotateSlowRev 8s linear infinite"}}/>
+      <div style={{position:"absolute",width:150,height:150,borderRadius:"50%",background:`radial-gradient(circle, ${rank.color}30, transparent 70%)`,animation:"rayPulse 2s ease-in-out infinite"}}/>
+      {/* Badge icon */}
+      <div style={{position:"relative",width:120,height:120,borderRadius:"50%",background:`linear-gradient(135deg, ${C.card2}, ${C.surface})`,border:`3px solid ${rank.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,boxShadow:`0 0 40px ${rank.color}88, inset 0 0 20px ${rank.color}33`,animation:"bounceIn .6s cubic-bezier(.34,1.56,.64,1)"}}>
+        {rank.icon}
+      </div>
+    </div>
+
+    <div style={{marginTop:24,textAlign:"center",animation:"textPop .5s ease .3s both"}}>
+      <div style={{fontSize:13,color:C.gold,fontWeight:800,letterSpacing:3,textTransform:"uppercase"}}>Niveau supérieur !</div>
+      <div style={{fontSize:52,fontWeight:900,color:C.text,letterSpacing:-2,marginTop:4,textShadow:`0 0 30px ${rank.color}66`}}>NIV. {lvl}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:10}}>
+        <span style={{fontSize:20}}>{rank.icon}</span>
+        <span style={{fontSize:16,fontWeight:700,color:rank.color}}>{rank.name}</span>
+      </div>
+    </div>
+
+    <div style={{marginTop:32,fontSize:12,color:C.sub,animation:"textPop .5s ease .5s both"}}>Touche l'écran pour continuer</div>
+  </div>;
+}
+
 // ── MAIN APP ──
 function App(){
   const[s,setS]=useState(null);
@@ -946,6 +1078,8 @@ function App(){
   const[toast,setToast]=useState(null);
   const[parts,setParts]=useState([]);
   const[loaded,setLoaded]=useState(false);
+  const[levelUp,setLevelUp]=useState(null);
+  const prevLvlRef=useRef(null);
 
   useEffect(()=>{
     try{
@@ -954,6 +1088,10 @@ function App(){
         const p=JSON.parse(raw);
         if(p.todayKey!==TODAY()){
           const ok=isCoreOk(p);
+          const{gs:dayScore}=computeGlobalScore(p);
+          const hist=(p.history||[]).filter(h=>h.date!==p.todayKey);
+          hist.push({date:p.todayKey,score:dayScore,perfect:ok});
+          p.history=hist.slice(-90); // keep last 90 days max
           if(ok){p.perfectDays=(p.perfectDays||0)+1;p.currentStreak=(p.currentStreak||0)+1;const cs=p.currentStreak;if(cs%7===0)p.xp=(p.xp||0)+100;else if(cs%3===0)p.xp=(p.xp||0)+50;}
           else p.currentStreak=0;
           if(p.debt===0)p.conscienceCleanStreak=(p.conscienceCleanStreak||0)+1;else p.conscienceCleanStreak=0;
@@ -966,8 +1104,10 @@ function App(){
         }
         if(!p.activities)p.activities=[];
         if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
+        if(!p.history)p.history=[];
+        prevLvlRef.current=getLvl(p.xp).lvl;
         setS(p);
-      }else setS(mkDef());
+      }else{setS(mkDef());prevLvlRef.current=1;}
     }catch{setS(mkDef());}
     setLoaded(true);
   },[]);
@@ -982,6 +1122,12 @@ function App(){
         next.newBadges=[...(next.newBadges||[]),...nb];
         nb.forEach(bid=>{const b=BADGES.find(x=>x.id===bid);if(b)setTimeout(()=>showT(`🏅 Badge : ${b.name} !`,C.gold,3500),800);});
       }
+      const newLvl=getLvl(next.xp).lvl;
+      if(prevLvlRef.current!==null&&newLvl>prevLvlRef.current){
+        const newRank=getRank(newLvl);
+        setTimeout(()=>setLevelUp({lvl:newLvl,rank:newRank}),300);
+      }
+      prevLvlRef.current=newLvl;
       persist(next);return next;
     });
   },[persist]);
@@ -992,24 +1138,13 @@ function App(){
   if(!loaded)return<div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}><div style={{fontSize:40}}>⚔️</div><div style={{color:C.violet,fontFamily:"monospace",fontSize:14,letterSpacing:3,animation:"pulse 1.5s infinite"}}>CHARGEMENT...</div></div>;
 
   const lvl=getLvl(s.xp),rank=getRank(lvl.lvl);
-  const cs={};
-  Object.keys(CATS).forEach(cat=>{
-    const all=[...CORE.filter(h=>h.cat===cat),...BONUS.filter(h=>h.cat===cat)];
-    if(!all.length){cs[cat]=0;return;}
-    const tot=all.reduce((a,h)=>{
-      if(h.unit==="check")return a+pct(Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length,h.goal);
-      if(h.id==="sleep")return a+pct(calcSleep(s.sleepBedtime,s.sleepWake),SG);
-      const pg=BONUS.find(b=>b.id===h.id)?(s.bonusProgress?.[h.id]||0):(s.coreProgress?.[h.id]||0);
-      return a+pct(pg,h.goal);
-    },0);
-    cs[cat]=Math.round(tot/all.length);
-  });
-  const gs=Math.round(Object.values(cs).reduce((a,b)=>a+b,0)/Object.keys(CATS).length);
+  const{cs,gs}=computeGlobalScore(s);
   const cc=isCoreOk(s);
 
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,overflowX:"hidden"}}>
     {parts.map(p=><div key={p.id} style={{position:"fixed",left:p.x,top:p.y,width:8,height:8,borderRadius:"50%",background:p.color,pointerEvents:"none",zIndex:9998,animation:"particle .8s ease forwards","--dx":p.dx+"px","--dy":p.dy+"px"}}/>)}
     {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#000",fontWeight:800,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 40px ${toast.color}66`,whiteSpace:"nowrap",animation:"pop .3s cubic-bezier(.34,1.56,.64,1)"}}>{toast.msg}</div>}
+    <LevelUpOverlay data={levelUp} onClose={()=>setLevelUp(null)}/>
 
     {/* Header */}
     <div style={{background:"linear-gradient(135deg,#0f0a1e 0%,#0a1020 100%)",borderBottom:`1px solid ${C.border}`,padding:"12px 16px"}}>
@@ -1039,7 +1174,7 @@ function App(){
       {tab==="dashboard"&&<Dashboard s={s} cs={cs} gs={gs} lvl={lvl} rank={rank} update={update} showT={showT} cc={cc}/>}
       {tab==="habits"&&<Habits s={s} update={update} showT={showT} sp={sp}/>}
       {tab==="epic"&&<Epic s={s} update={update} showT={showT}/>}
-      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank}/>}
+      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank} gs={gs}/>}
       {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} update={update} showT={showT}/>}
       {tab==="journal"&&<Journal s={s} update={update} showT={showT}/>}
       {tab==="settings"&&<Settings s={s} update={update} showT={showT}/>}
