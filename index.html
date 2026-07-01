@@ -16,6 +16,7 @@ body{background:#080810;font-family:'Inter',system-ui,sans-serif;color:#eeeeff;o
 input,textarea{outline:none;color:#eeeeff;font-family:inherit;}
 button{font-family:inherit;}
 button:active{opacity:.75;transform:scale(.97);}
+.btn3d:active{transform:translateY(3px)!important;box-shadow:0 0 0 rgba(0,0,0,0), inset 0 1px 0 rgba(255,255,255,0.15)!important;opacity:1!important;}
 ::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-thumb{background:#2a2a45;border-radius:4px;}
 @keyframes pop{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
@@ -31,6 +32,8 @@ button:active{opacity:.75;transform:scale(.97);}
 @keyframes textPop{0%{transform:scale(0.5);opacity:0}60%{transform:scale(1.1);opacity:1}100%{transform:scale(1)}}
 @keyframes confettiFall{to{transform:translateY(420px) rotate(var(--rot));opacity:0}}
 @keyframes rayPulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes badgeShine{0%{left:-150%}35%{left:150%}100%{left:150%}}
+@keyframes segPop{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 </style>
 </head>
 <body>
@@ -254,10 +257,44 @@ const chkBadges=s=>{
 };
 
 // ── SHARED UI ──
-const Crd=({children,style={}})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:16,...style}}>{children}</div>;
+const Crd=({children,style={},accent})=><div style={{
+  background:`linear-gradient(180deg, ${C.card2} 0%, ${C.card} 100%)`,
+  border:`1.5px solid ${accent?accent+"55":C.border}`,
+  borderRadius:18,
+  padding:16,
+  boxShadow:accent
+    ?`0 4px 0 ${accent}33, 0 8px 20px -6px ${accent}40, inset 0 1px 0 rgba(255,255,255,0.04)`
+    :`0 3px 0 rgba(0,0,0,0.35), 0 6px 16px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)`,
+  position:"relative",
+  ...style
+}}>{children}</div>;
 const Br=({val,max,color,h=7,glow})=>{const p=Math.min((val/max)*100,100);return<div style={{background:C.dim,borderRadius:8,height:h,overflow:"hidden"}}><div style={{height:"100%",width:`${p}%`,background:color,borderRadius:8,transition:"width .5s ease",boxShadow:glow?`0 0 8px ${color}88`:"none"}}/></div>;};
+const SegBar=({pct,color,segments=16,h=8})=>{
+  const filled=Math.floor((pct/100)*segments);
+  const partial=((pct/100)*segments)-filled;
+  return<div style={{display:"flex",gap:2,height:h}}>
+    {Array.from({length:segments}).map((_,i)=>{
+      const isFull=i<filled;
+      const isPartial=i===filled&&partial>0;
+      return<div key={i} style={{flex:1,background:C.dim,borderRadius:2,overflow:"hidden",position:"relative"}}>
+        {(isFull||isPartial)&&<div style={{position:"absolute",inset:0,background:color,borderRadius:2,width:isFull?"100%":`${partial*100}%`,boxShadow:`0 0 6px ${color}aa`,animation:isFull?`segPop .3s ease ${i*0.02}s both`:"none"}}/>}
+      </div>;
+    })}
+  </div>;
+};
 const Lbl=({children})=><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.sub,textTransform:"uppercase"}}>{children}</div>;
-const Btn=({children,onClick,color,full,small})=>{const dk=[C.gold,C.emerald,C.amber,C.green].includes(color);return<button onClick={onClick} style={{background:color,color:dk?"#000":"#fff",border:"none",borderRadius:small?8:10,padding:small?"6px 12px":"9px 16px",fontWeight:700,fontSize:small?12:13,cursor:"pointer",width:full?"100%":"auto",flexShrink:0,transition:"opacity .15s"}}>{children}</button>;};
+const Btn=({children,onClick,color,full,small})=>{
+  const dk=[C.gold,C.emerald,C.amber,C.green].includes(color);
+  return<button onClick={onClick} className="btn3d" style={{
+    background:color,color:dk?"#000":"#fff",border:"none",
+    borderRadius:small?9:12,
+    padding:small?"6px 12px":"10px 16px",
+    fontWeight:800,fontSize:small?12:13,cursor:"pointer",
+    width:full?"100%":"auto",flexShrink:0,
+    boxShadow:`0 3px 0 rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25)`,
+    transition:"transform .1s ease, box-shadow .1s ease",
+  }}>{children}</button>;
+};
 const MStat=({icon,val,label,color})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18}}>{icon}</div><div style={{fontSize:22,fontWeight:900,color,marginTop:2}}>{val}</div><div style={{fontSize:10,color:C.sub,marginTop:1}}>{label}</div></div>;
 const iS={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13};
 const tS={...iS,width:"100%",resize:"none",fontFamily:"inherit"};
@@ -758,7 +795,7 @@ function Profile({s,lvl,rank,gs}){
       </div>
       <div style={{marginTop:14}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub,marginBottom:4}}><span>→ niv.{lvl.lvl+1}</span><span>{Math.round(lvl.rem)}/{lvl.needed} XP</span></div>
-        <Br val={lvl.rem} max={lvl.needed} color={rank.color} glow/>
+        <SegBar pct={lvl.pct} color={rank.color} segments={20} h={8}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginTop:14}}>
         {[{v:s.perfectDays||0,l:"Parfaits"},{v:ul.length,l:"Badges"},{v:s.gymTotal||0,l:"Gym"}].map(({v,l})=><div key={l} style={{background:"rgba(255,255,255,0.04)",borderRadius:10,padding:"8px 6px",textAlign:"center"}}><div style={{fontSize:18,fontWeight:900,color:C.text}}>{v}</div><div style={{fontSize:9,color:C.sub,marginTop:1}}>{l}</div></div>)}
@@ -778,11 +815,13 @@ function Profile({s,lvl,rank,gs}){
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {filtered.map(b=>{
           const got=ul.includes(b.id),rc=RC[b.rarity],isNew=s.newBadges?.includes(b.id);
-          return<div key={b.id} style={{background:got?rc.bg:C.surface,border:`1px solid ${got?rc.border:C.border}`,borderRadius:12,padding:"10px 14px",display:"flex",gap:12,alignItems:"center",opacity:got?1:0.4,boxShadow:got?rc.glow:"none",position:"relative"}}>
-            {isNew&&<div style={{position:"absolute",top:-4,right:-4,background:C.gold,borderRadius:"50%",width:12,height:12,animation:"shimmer 1.5s infinite"}}/>}
-            <span style={{fontSize:24,filter:got?"none":"grayscale(1)"}}>{b.icon}</span>
-            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:got?rc.text:C.sub}}>{b.name}</div><div style={{fontSize:11,color:C.sub,marginTop:2}}>{b.desc}</div></div>
-            <div style={{fontSize:9,fontWeight:800,color:rc.text,textTransform:"uppercase",letterSpacing:1,opacity:got?1:0.5}}>{b.rarity}</div>
+          const shiny=got&&(b.rarity==="epic"||b.rarity==="legendary");
+          return<div key={b.id} style={{background:got?rc.bg:C.surface,border:`1.5px solid ${got?rc.border:C.border}`,borderRadius:12,padding:"10px 14px",display:"flex",gap:12,alignItems:"center",opacity:got?1:0.4,boxShadow:got?rc.glow:"none",position:"relative",overflow:"hidden"}}>
+            {isNew&&<div style={{position:"absolute",top:-4,right:-4,background:C.gold,borderRadius:"50%",width:12,height:12,animation:"shimmer 1.5s infinite",zIndex:2}}/>}
+            {shiny&&<div style={{position:"absolute",top:0,left:"-150%",width:"60%",height:"100%",background:`linear-gradient(115deg, transparent 0%, ${rc.text}33 45%, ${rc.text}66 50%, ${rc.text}33 55%, transparent 100%)`,animation:"badgeShine 3.5s ease-in-out infinite",pointerEvents:"none"}}/>}
+            <span style={{fontSize:24,filter:got?"none":"grayscale(1)",position:"relative",zIndex:1}}>{b.icon}</span>
+            <div style={{flex:1,position:"relative",zIndex:1}}><div style={{fontWeight:700,fontSize:13,color:got?rc.text:C.sub}}>{b.name}</div><div style={{fontSize:11,color:C.sub,marginTop:2}}>{b.desc}</div></div>
+            <div style={{fontSize:9,fontWeight:800,color:rc.text,textTransform:"uppercase",letterSpacing:1,opacity:got?1:0.5,position:"relative",zIndex:1}}>{b.rarity}</div>
           </div>;
         })}
       </div>
@@ -1158,8 +1197,8 @@ function App(){
           <div style={{fontSize:10,color:C.sub}}>{Math.round(lvl.rem)}/{lvl.needed} → niv.{lvl.lvl+1}</div>
         </div>
       </div>
-      <div style={{marginTop:8,height:5,background:C.dim,borderRadius:8,overflow:"hidden",position:"relative"}}>
-        <div style={{position:"absolute",top:0,left:0,height:"100%",width:`${lvl.pct}%`,background:`linear-gradient(90deg,${C.purple},${C.lavender})`,borderRadius:8,transition:"width .6s ease",boxShadow:`0 0 8px ${C.violet}`}}/>
+      <div style={{marginTop:8}}>
+        <SegBar pct={lvl.pct} color={C.violet} segments={20} h={7}/>
       </div>
       <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
         <span style={{fontSize:11,color:C.sub}}>Score du jour</span>
