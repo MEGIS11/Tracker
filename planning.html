@@ -139,7 +139,7 @@ const inSt={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,c
 // ═══════════════════ TIMELINE VIEW ═══════════════════
 function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHour=24}){
   const containerRef=useRef(null);
-  const [resizing,setResizing]=useState(null); // {id, startY, origEnd}
+  const [resizing,setResizing]=useState(null); // {id, startY, origEndMin, startMin}
   const HOUR_H=64;
   const totalMin=(endHour-startHour)*60;
   const totalH=(endHour-startHour)*HOUR_H;
@@ -151,29 +151,38 @@ function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHo
   const showNowLine=nowMin>=startHour*60&&nowMin<=endHour*60;
   const nowY=((nowMin-startHour*60)/totalMin)*totalH;
 
-  const yToMin=(y)=>startHour*60+(y/totalH)*totalMin;
-
-  const handlePointerDown=(b,e)=>{
-    e.stopPropagation();
-    setResizing({id:b.id,startY:e.clientY,origEndMin:timeToMin(b.end)});
+  const handlePointerDown=(b,clientY,e)=>{
+    if(e){e.preventDefault();e.stopPropagation();}
+    setResizing({id:b.id,startY:clientY,origEndMin:timeToMin(b.end),startMin:timeToMin(b.start)});
   };
+
   useEffect(()=>{
     if(!resizing)return;
-    const onMove=(e)=>{
-      const deltaY=e.clientY-resizing.startY;
+    const onMoveGeneric=(clientY)=>{
+      const deltaY=clientY-resizing.startY;
       const deltaMin=Math.round((deltaY/HOUR_H*60)/5)*5;
       let newEndMin=resizing.origEndMin+deltaMin;
-      newEndMin=Math.max(newEndMin,0);
+      // Never let end go below start+15min, and cap at end of the visible day (endHour*60)
+      newEndMin=Math.max(newEndMin,resizing.startMin+15);
+      newEndMin=Math.min(newEndMin,endHour*60);
       onResize(resizing.id,minToTime(newEndMin));
     };
+    const onMouseMove=(e)=>onMoveGeneric(e.clientY);
+    const onTouchMove=(e)=>{
+      if(e.touches&&e.touches[0]){e.preventDefault();onMoveGeneric(e.touches[0].clientY);}
+    };
     const onUp=()=>setResizing(null);
-    window.addEventListener("mousemove",onMove);
+    window.addEventListener("mousemove",onMouseMove);
     window.addEventListener("mouseup",onUp);
-    window.addEventListener("touchmove",(e)=>onMove(e.touches[0]),{passive:false});
+    window.addEventListener("touchmove",onTouchMove,{passive:false});
     window.addEventListener("touchend",onUp);
+    window.addEventListener("touchcancel",onUp);
     return()=>{
-      window.removeEventListener("mousemove",onMove);
+      window.removeEventListener("mousemove",onMouseMove);
       window.removeEventListener("mouseup",onUp);
+      window.removeEventListener("touchmove",onTouchMove);
+      window.removeEventListener("touchend",onUp);
+      window.removeEventListener("touchcancel",onUp);
     };
   },[resizing]);
 
@@ -197,17 +206,17 @@ function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHo
         const top=((sMin-startHour*60)/totalMin)*totalH;
         const height=Math.max(((eMin-sMin)/totalMin)*totalH,26);
         const isConflict=conflicts.has(b.id);
-        const type=BLOCK_TYPES[b.type];
+        const isResizingThis=resizing?.id===b.id;
         return<div key={b.id} style={{
           position:"absolute",top,left:48,right:4,height,
           background:b.done?`${C.emerald}18`:`${b.color}20`,
           border:`1.5px solid ${isConflict?C.rose:b.done?C.emerald:b.color}`,
-          borderRadius:10,padding:"5px 8px",overflow:"hidden",
+          borderRadius:10,padding:"5px 8px",overflow:"visible",
           animation:`blockIn .3s ease ${idx*0.03}s both`,
           boxShadow:isConflict?`0 0 0 1px ${C.rose}66`:"none",
-          cursor:"pointer",zIndex:isConflict?3:2,
-        }} onClick={()=>onToggle(b.id)}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",height:"100%"}}>
+          cursor:"pointer",zIndex:isResizingThis?10:isConflict?3:2,
+        }} onClick={()=>!resizing&&onToggle(b.id)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",height:"100%",overflow:"hidden"}}>
             <div style={{overflow:"hidden",flex:1}}>
               <div style={{fontSize:11,fontWeight:700,color:b.done?C.emerald:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textDecoration:b.done?"line-through":"none"}}>
                 {b.icon} {b.label}
@@ -215,15 +224,15 @@ function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHo
               {height>36&&<div style={{fontSize:9,color:C.sub,marginTop:2}}>{b.start}–{b.end}</div>}
               {isConflict&&<div style={{fontSize:9,color:C.rose,fontWeight:700,marginTop:2,animation:"pulseWarn 1.5s infinite"}}>⚠️ Conflit</div>}
             </div>
-            <button onClick={(e)=>{e.stopPropagation();onRemove(b.id);}} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:14,padding:0,lineHeight:1,flexShrink:0}}>×</button>
+            <button onClick={(e)=>{e.stopPropagation();onRemove(b.id);}} style={{background:C.bg+"88",border:"none",borderRadius:"50%",width:20,height:20,color:C.text,cursor:"pointer",fontSize:14,padding:0,lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:4}}>×</button>
           </div>
           {/* Resize handle */}
           <div
-            onMouseDown={(e)=>handlePointerDown(b,e)}
-            onTouchStart={(e)=>handlePointerDown(b,e.touches[0])}
-            style={{position:"absolute",bottom:0,left:0,right:0,height:10,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}
+            onMouseDown={(e)=>handlePointerDown(b,e.clientY,e)}
+            onTouchStart={(e)=>handlePointerDown(b,e.touches[0].clientY,e)}
+            style={{position:"absolute",bottom:-8,left:0,right:0,height:20,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center",zIndex:11}}
           >
-            <div style={{width:24,height:3,borderRadius:2,background:`${b.color}88`}}/>
+            <div style={{width:28,height:4,borderRadius:2,background:isResizingThis?C.gold:`${b.color}aa`}}/>
           </div>
         </div>;
       })}
