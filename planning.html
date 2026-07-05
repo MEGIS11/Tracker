@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Amaury's Planning"/>
+<title>Amaury's Planning</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:#07070d;font-family:'Inter',system-ui,sans-serif;color:#eeeeff;overscroll-behavior:none;}
+input,textarea,select{outline:none;color:#eeeeff;font-family:inherit;}
+button{font-family:inherit;}
+button:active{opacity:.8;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:#2a2a45;border-radius:4px;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pop{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+@keyframes modalIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes blockIn{from{opacity:0;transform:scaleY(0.7);transform-origin:top}to{opacity:1;transform:scaleY(1)}}
+@keyframes pulseWarn{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes slideTab{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef,useMemo}=React;
+
+const C={
+  bg:"#07070d",surface:"#0e0e18",card:"#131320",card2:"#191928",
+  border:"#20203a",muted:"#2c2c4a",dim:"#33335a",
+  text:"#eeeeff",sub:"#6a6aa8",
+  purple:"#7c3aed",violet:"#a78bfa",indigo:"#6366f1",
+  green:"#10b981",emerald:"#34d399",
+  yellow:"#f59e0b",gold:"#fbbf24",
+  red:"#e11d48",rose:"#f43f5e",
+  blue:"#0ea5e9",sky:"#38bdf8",
+  orange:"#ea580c",amber:"#fb923c",
+  pink:"#db2777",fuchsia:"#f472b6",
+};
+
+const SK="amaury-planning-v2";
+const TODAY=()=>new Date().toISOString().slice(0,10);
+const TOMORROW=()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);};
+const dateKey=(d)=>d.toISOString().slice(0,10);
+
+const HABIT_PRESETS=[
+  {label:"Hydratation",icon:"💧",color:C.sky,cat:"corps"},
+  {label:"Séance Gym",icon:"🏋️",color:C.violet,cat:"corps"},
+  {label:"Sommeil",icon:"😴",color:C.purple,cat:"corps"},
+  {label:"Protéines",icon:"🥩",color:C.amber,cat:"nutrition"},
+  {label:"Fruits & Légumes",icon:"🥦",color:C.emerald,cat:"nutrition"},
+  {label:"Japonais",icon:"🎌",color:C.fuchsia,cat:"cerveau"},
+  {label:"Lecture",icon:"📚",color:C.gold,cat:"cerveau"},
+  {label:"Routine apparence",icon:"✨",color:C.amber,cat:"apparence"},
+  {label:"Lever tôt",icon:"🌅",color:C.gold,cat:"discipline"},
+  {label:"Méditation",icon:"🧘",color:C.emerald,cat:"discipline"},
+  {label:"One Piece",icon:"🏴‍☠️",color:C.red,cat:"discipline"},
+  {label:"Étirements",icon:"🤸",color:C.emerald,cat:"corps"},
+  {label:"Dessin",icon:"🎨",color:C.fuchsia,cat:"cerveau"},
+  {label:"Ranger",icon:"🧹",color:C.sub,cat:"discipline"},
+  {label:"Cuisiner",icon:"🍳",color:C.amber,cat:"discipline"},
+];
+const EPIC_PRESETS=[
+  {label:"Backflip — entraînement",icon:"🤸",color:C.pink,cat:"corps"},
+  {label:"Cuisine — nouveau plat",icon:"🍽️",color:C.pink,cat:"nutrition"},
+  {label:"Japonais — vocabulaire",icon:"🎌",color:C.pink,cat:"cerveau"},
+  {label:"Carnet de croquis",icon:"🎨",color:C.pink,cat:"cerveau"},
+  {label:"Style — essayer une tenue",icon:"👔",color:C.pink,cat:"apparence"},
+  {label:"Tractions — entraînement",icon:"💪",color:C.pink,cat:"corps"},
+];
+const BLOCK_TYPES={
+  habit:{label:"Habitude",icon:"📋",color:C.violet},
+  epic:{label:"Quête épique",icon:"⚔️",color:C.fuchsia},
+  event:{label:"Événement",icon:"📌",color:C.sky},
+};
+const CATS={
+  corps:{label:"Corps",icon:"💪",color:C.violet},
+  nutrition:{label:"Nutrition",icon:"🥗",color:C.emerald},
+  cerveau:{label:"Cerveau",icon:"🧠",color:C.sky},
+  apparence:{label:"Apparence",icon:"✨",color:C.amber},
+  discipline:{label:"Discipline",icon:"🎯",color:C.fuchsia},
+  autre:{label:"Autre",icon:"📌",color:C.sub},
+};
+
+const mkDef=()=>({plans:{}});
+
+const timeToMin=(t)=>{if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;};
+const minToTime=(m)=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60);const mi=m%60;return `${String(h).padStart(2,"0")}:${String(mi).padStart(2,"0")}`;};
+
+function detectConflicts(blocks){
+  const sorted=[...blocks].sort((a,b)=>timeToMin(a.start)-timeToMin(b.start));
+  const conflictIds=new Set();
+  for(let i=0;i<sorted.length-1;i++){
+    if(timeToMin(sorted[i].end)>timeToMin(sorted[i+1].start)){
+      conflictIds.add(sorted[i].id);conflictIds.add(sorted[i+1].id);
+    }
+  }
+  return conflictIds;
+}
+
+function findFreeSlots(blocks,dayStart=6*60,dayEnd=24*60,minDuration=20){
+  const sorted=[...blocks].sort((a,b)=>timeToMin(a.start)-timeToMin(b.start));
+  const slots=[];
+  let cursor=dayStart;
+  for(const b of sorted){
+    const s=timeToMin(b.start),e=timeToMin(b.end);
+    if(s>cursor+minDuration)slots.push({start:cursor,end:s});
+    cursor=Math.max(cursor,e);
+  }
+  if(dayEnd>cursor+minDuration)slots.push({start:cursor,end:dayEnd});
+  return slots;
+}
+
+const Crd=({children,style={}})=><div style={{
+  background:`linear-gradient(180deg, ${C.card2} 0%, ${C.card} 100%)`,
+  border:`1.5px solid ${C.border}`,borderRadius:18,padding:16,
+  boxShadow:`0 3px 0 rgba(0,0,0,0.35), 0 6px 16px -8px rgba(0,0,0,0.5)`,
+  ...style
+}}>{children}</div>;
+const Lbl=({children})=><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.sub,textTransform:"uppercase"}}>{children}</div>;
+const Btn=({children,onClick,color,full,small})=>{
+  const dk=[C.gold,C.emerald,C.amber,C.green].includes(color);
+  return<button onClick={onClick} style={{
+    background:color,color:dk?"#000":"#fff",border:"none",
+    borderRadius:small?9:12,padding:small?"6px 12px":"10px 16px",
+    fontWeight:800,fontSize:small?12:13,cursor:"pointer",
+    width:full?"100%":"auto",flexShrink:0,
+    boxShadow:`0 3px 0 rgba(0,0,0,0.28)`,
+  }}>{children}</button>;
+};
+const inSt={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13};
+
+// ═══════════════════ TIMELINE VIEW ═══════════════════
+function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHour=24}){
+  const containerRef=useRef(null);
+  const [resizing,setResizing]=useState(null); // {id, startY, origEnd}
+  const HOUR_H=64;
+  const totalMin=(endHour-startHour)*60;
+  const totalH=(endHour-startHour)*HOUR_H;
+
+  const hours=[];
+  for(let h=startHour;h<=endHour;h++)hours.push(h);
+
+  const nowMin=(()=>{const n=new Date();return n.getHours()*60+n.getMinutes();})();
+  const showNowLine=nowMin>=startHour*60&&nowMin<=endHour*60;
+  const nowY=((nowMin-startHour*60)/totalMin)*totalH;
+
+  const yToMin=(y)=>startHour*60+(y/totalH)*totalMin;
+
+  const handlePointerDown=(b,e)=>{
+    e.stopPropagation();
+    setResizing({id:b.id,startY:e.clientY,origEndMin:timeToMin(b.end)});
+  };
+  useEffect(()=>{
+    if(!resizing)return;
+    const onMove=(e)=>{
+      const deltaY=e.clientY-resizing.startY;
+      const deltaMin=Math.round((deltaY/HOUR_H*60)/5)*5;
+      let newEndMin=resizing.origEndMin+deltaMin;
+      newEndMin=Math.max(newEndMin,0);
+      onResize(resizing.id,minToTime(newEndMin));
+    };
+    const onUp=()=>setResizing(null);
+    window.addEventListener("mousemove",onMove);
+    window.addEventListener("mouseup",onUp);
+    window.addEventListener("touchmove",(e)=>onMove(e.touches[0]),{passive:false});
+    window.addEventListener("touchend",onUp);
+    return()=>{
+      window.removeEventListener("mousemove",onMove);
+      window.removeEventListener("mouseup",onUp);
+    };
+  },[resizing]);
+
+  return<div ref={containerRef} style={{position:"relative",marginTop:8}}>
+    {/* Hour grid */}
+    <div style={{position:"relative",height:totalH}}>
+      {hours.map((h,i)=>(
+        <div key={h} style={{position:"absolute",top:i*HOUR_H,left:0,right:0,height:HOUR_H,borderTop:`1px solid ${C.border}`,display:"flex"}}>
+          <div style={{width:42,flexShrink:0,fontSize:10,color:C.sub,transform:"translateY(-6px)",paddingRight:6,textAlign:"right"}}>{String(h).padStart(2,"0")}h</div>
+        </div>
+      ))}
+
+      {/* Now line */}
+      {showNowLine&&<div style={{position:"absolute",top:nowY,left:42,right:0,height:2,background:C.rose,zIndex:5,boxShadow:`0 0 8px ${C.rose}`}}>
+        <div style={{position:"absolute",left:-5,top:-4,width:10,height:10,borderRadius:"50%",background:C.rose,boxShadow:`0 0 8px ${C.rose}`}}/>
+      </div>}
+
+      {/* Blocks */}
+      {blocks.map((b,idx)=>{
+        const sMin=timeToMin(b.start),eMin=Math.max(timeToMin(b.end),sMin+15);
+        const top=((sMin-startHour*60)/totalMin)*totalH;
+        const height=Math.max(((eMin-sMin)/totalMin)*totalH,26);
+        const isConflict=conflicts.has(b.id);
+        const type=BLOCK_TYPES[b.type];
+        return<div key={b.id} style={{
+          position:"absolute",top,left:48,right:4,height,
+          background:b.done?`${C.emerald}18`:`${b.color}20`,
+          border:`1.5px solid ${isConflict?C.rose:b.done?C.emerald:b.color}`,
+          borderRadius:10,padding:"5px 8px",overflow:"hidden",
+          animation:`blockIn .3s ease ${idx*0.03}s both`,
+          boxShadow:isConflict?`0 0 0 1px ${C.rose}66`:"none",
+          cursor:"pointer",zIndex:isConflict?3:2,
+        }} onClick={()=>onToggle(b.id)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",height:"100%"}}>
+            <div style={{overflow:"hidden",flex:1}}>
+              <div style={{fontSize:11,fontWeight:700,color:b.done?C.emerald:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textDecoration:b.done?"line-through":"none"}}>
+                {b.icon} {b.label}
+              </div>
+              {height>36&&<div style={{fontSize:9,color:C.sub,marginTop:2}}>{b.start}–{b.end}</div>}
+              {isConflict&&<div style={{fontSize:9,color:C.rose,fontWeight:700,marginTop:2,animation:"pulseWarn 1.5s infinite"}}>⚠️ Conflit</div>}
+            </div>
+            <button onClick={(e)=>{e.stopPropagation();onRemove(b.id);}} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:14,padding:0,lineHeight:1,flexShrink:0}}>×</button>
+          </div>
+          {/* Resize handle */}
+          <div
+            onMouseDown={(e)=>handlePointerDown(b,e)}
+            onTouchStart={(e)=>handlePointerDown(b,e.touches[0])}
+            style={{position:"absolute",bottom:0,left:0,right:0,height:10,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center"}}
+          >
+            <div style={{width:24,height:3,borderRadius:2,background:`${b.color}88`}}/>
+          </div>
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+// ═══════════════════ WEEK VIEW ═══════════════════
+function WeekView({plans,onSelectDay}){
+  const days=[];
+  const today=new Date();
+  for(let i=0;i<7;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    days.push(d);
+  }
+  const catMinutesForDay=(key)=>{
+    const blocks=plans[key]||[];
+    const totals={};
+    blocks.forEach(b=>{
+      const preset=[...HABIT_PRESETS,...EPIC_PRESETS].find(p=>p.label===b.label);
+      const cat=preset?.cat||"autre";
+      const dur=Math.max(0,timeToMin(b.end)-timeToMin(b.start));
+      totals[cat]=(totals[cat]||0)+dur;
+    });
+    return totals;
+  };
+
+  // Weekly category totals for the stats bar
+  const weekTotals={};
+  days.forEach(d=>{
+    const t=catMinutesForDay(dateKey(d));
+    Object.entries(t).forEach(([k,v])=>{weekTotals[k]=(weekTotals[k]||0)+v;});
+  });
+  const maxCatMin=Math.max(1,...Object.values(weekTotals));
+
+  return<div style={{display:"flex",flexDirection:"column",gap:10,animation:"slideTab .3s ease"}}>
+    {days.map((d,i)=>{
+      const key=dateKey(d);
+      const blocks=(plans[key]||[]).slice().sort((a,b)=>timeToMin(a.start)-timeToMin(b.start));
+      const done=blocks.filter(b=>b.done).length;
+      const label=d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"short"});
+      const isToday=key===TODAY();
+      return<button key={key} onClick={()=>onSelectDay(key)} style={{
+        textAlign:"left",background:isToday?`${C.violet}18`:C.card,
+        border:`1.5px solid ${isToday?C.violet:C.border}`,borderRadius:14,
+        padding:"12px 14px",cursor:"pointer",color:C.text
+      }}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:13,fontWeight:700,textTransform:"capitalize"}}>{label}{isToday&&<span style={{color:C.violet,fontSize:11,marginLeft:6}}>· Aujourd'hui</span>}</div>
+          <div style={{fontSize:11,color:C.sub}}>{blocks.length>0?`${done}/${blocks.length}`:"—"}</div>
+        </div>
+        {blocks.length>0&&<div style={{display:"flex",gap:4,marginTop:8,flexWrap:"wrap"}}>
+          {blocks.slice(0,6).map(b=><div key={b.id} style={{width:8,height:8,borderRadius:"50%",background:b.done?C.emerald:b.color}}/>)}
+          {blocks.length>6&&<span style={{fontSize:10,color:C.sub}}>+{blocks.length-6}</span>}
+        </div>}
+      </button>;
+    })}
+
+    {/* Weekly category stats */}
+    <Crd style={{marginTop:6}}>
+      <Lbl>TEMPS PLANIFIÉ PAR CATÉGORIE (SEMAINE)</Lbl>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+        {Object.entries(CATS).map(([k,cat])=>{
+          const mins=weekTotals[k]||0;
+          if(mins===0)return null;
+          const pct=(mins/maxCatMin)*100;
+          const h=Math.floor(mins/60),m=mins%60;
+          return<div key={k}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+              <span>{cat.icon} {cat.label}</span>
+              <span style={{color:C.sub}}>{h>0?`${h}h`:""}{m>0?`${m}min`:""}</span>
+            </div>
+            <div style={{background:C.dim,borderRadius:6,height:6,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:cat.color,borderRadius:6}}/>
+            </div>
+          </div>;
+        })}
+        {Object.keys(weekTotals).length===0&&<div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"10px 0"}}>Rien de planifié cette semaine pour l'instant.</div>}
+      </div>
+    </Crd>
+  </div>;
+}
+
+// ═══════════════════ MAIN APP ═══════════════════
+function App(){
+  const[data,setData]=useState(null);
+  const[loaded,setLoaded]=useState(false);
+  const[viewDate,setViewDate]=useState(TOMORROW());
+  const[viewMode,setViewMode]=useState("day"); // day | week
+  const[toast,setToast]=useState(null);
+  const[adding,setAdding]=useState(false);
+
+  useEffect(()=>{
+    try{
+      const raw=localStorage.getItem(SK);
+      setData(raw?JSON.parse(raw):mkDef());
+    }catch{setData(mkDef());}
+    setLoaded(true);
+  },[]);
+
+  const persist=useCallback(n=>{try{localStorage.setItem(SK,JSON.stringify(n));}catch{}},[]);
+  const update=useCallback(fn=>{
+    setData(prev=>{const next=fn({...prev});persist(next);return next;});
+  },[persist]);
+
+  const showT=(msg,color=C.emerald)=>{setToast({msg,color});setTimeout(()=>setToast(null),2200);};
+
+  if(!loaded)return<div style={{background:C.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:C.violet,fontFamily:"monospace",fontSize:14}}>CHARGEMENT...</div></div>;
+
+  const dayBlocks=(data.plans[viewDate]||[]).slice().sort((a,b)=>timeToMin(a.start)-timeToMin(b.start));
+  const conflicts=detectConflicts(dayBlocks);
+  const freeSlots=findFreeSlots(dayBlocks);
+  const totalFreeMin=freeSlots.reduce((a,s)=>a+(s.end-s.start),0);
+
+  const addBlock=(block)=>{
+    update(p=>{
+      const list=[...(p.plans[viewDate]||[]),{...block,id:Date.now(),done:false}];
+      return{...p,plans:{...p.plans,[viewDate]:list}};
+    });
+    showT("Ajouté au planning !",C.emerald);
+    setAdding(false);
+  };
+  const toggleDone=(id)=>update(p=>({...p,plans:{...p.plans,[viewDate]:(p.plans[viewDate]||[]).map(b=>b.id===id?{...b,done:!b.done}:b)}}));
+  const removeBlock=(id)=>update(p=>({...p,plans:{...p.plans,[viewDate]:(p.plans[viewDate]||[]).filter(b=>b.id!==id)}}));
+  const resizeBlock=(id,newEnd)=>update(p=>({...p,plans:{...p.plans,[viewDate]:(p.plans[viewDate]||[]).map(b=>b.id===id?{...b,end:newEnd}:b)}}));
+
+  const dateObj=new Date(viewDate+"T00:00:00");
+  const dateLabel=dateObj.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  const isToday=viewDate===TODAY();
+  const isTomorrow=viewDate===TOMORROW();
+
+  const changeDay=(delta)=>{
+    const d=new Date(viewDate+"T00:00:00");
+    d.setDate(d.getDate()+delta);
+    setViewDate(d.toISOString().slice(0,10));
+  };
+
+  const completedCount=dayBlocks.filter(b=>b.done).length;
+  const fh=Math.floor(totalFreeMin/60),fm=totalFreeMin%60;
+
+  return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text}}>
+    {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#000",fontWeight:800,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 40px ${toast.color}66`,whiteSpace:"nowrap",animation:"pop .3s ease"}}>{toast.msg}</div>}
+
+    {/* Header */}
+    <div style={{background:"linear-gradient(135deg,#0f0a1e 0%,#0a1020 100%)",borderBottom:`1px solid ${C.border}`,padding:"14px 16px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:10,color:C.sub,letterSpacing:2,textTransform:"uppercase"}}>📅 Planning</div>
+        <div style={{display:"flex",gap:6}}>
+          {["day","week"].map(v=>(
+            <button key={v} onClick={()=>setViewMode(v)} style={{
+              background:viewMode===v?C.violet:C.surface,color:viewMode===v?"#fff":C.sub,
+              border:`1px solid ${viewMode===v?C.violet:C.border}`,borderRadius:16,
+              padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer"
+            }}>{v==="day"?"Jour":"Semaine"}</button>
+          ))}
+        </div>
+      </div>
+
+      {viewMode==="day"&&<>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+          <button onClick={()=>changeDay(-1)} style={{background:"none",border:"none",color:C.sub,fontSize:20,cursor:"pointer",padding:"4px 10px"}}>‹</button>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:16,fontWeight:800,textTransform:"capitalize"}}>{dateLabel}</div>
+            <div style={{fontSize:11,color:isTomorrow?C.violet:C.sub,fontWeight:isTomorrow?700:400}}>{isToday?"Aujourd'hui":isTomorrow?"Demain":""}</div>
+          </div>
+          <button onClick={()=>changeDay(1)} style={{background:"none",border:"none",color:C.sub,fontSize:20,cursor:"pointer",padding:"4px 10px"}}>›</button>
+        </div>
+        <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:8}}>
+          {dayBlocks.length>0&&<div style={{fontSize:11,color:C.sub}}>✓ {completedCount}/{dayBlocks.length}</div>}
+          <div style={{fontSize:11,color:C.emerald}}>🕐 {fh}h{fm>0?fm:""} libre</div>
+          {conflicts.size>0&&<div style={{fontSize:11,color:C.rose,fontWeight:700}}>⚠️ {conflicts.size} conflit{conflicts.size>1?"s":""}</div>}
+        </div>
+      </>}
+    </div>
+
+    <div style={{padding:"16px 14px 100px"}}>
+      {viewMode==="week"
+        ?<WeekView plans={data.plans} onSelectDay={(key)=>{setViewDate(key);setViewMode("day");}}/>
+        :<>
+          {!isTomorrow&&<Btn onClick={()=>setViewDate(TOMORROW())} color={C.violet} full>📆 Aller au planning de demain</Btn>}
+
+          {dayBlocks.length===0
+            ?<div style={{textAlign:"center",padding:"50px 20px",color:C.sub}}>
+                <div style={{fontSize:36,marginBottom:10}}>🗓️</div>
+                <div style={{fontSize:13}}>Aucun créneau planifié pour cette journée.</div>
+              </div>
+            :<Timeline blocks={dayBlocks} conflicts={conflicts} onToggle={toggleDone} onRemove={removeBlock} onResize={resizeBlock}/>
+          }
+
+          {freeSlots.length>0&&dayBlocks.length>0&&<Crd style={{marginTop:16}}>
+            <Lbl>🕐 CRÉNEAUX LIBRES</Lbl>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
+              {freeSlots.map((s,i)=>{
+                const dur=s.end-s.start;
+                if(dur<20)return null;
+                const h=Math.floor(dur/60),m=dur%60;
+                return<div key={i} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 12px",fontSize:12,color:C.sub}}>
+                  {minToTime(s.start)}–{minToTime(s.end)} <span style={{color:C.emerald}}>({h>0?`${h}h`:""}{m>0?`${m}min`:""})</span>
+                </div>;
+              })}
+            </div>
+          </Crd>}
+
+          {!adding
+            ?<button onClick={()=>setAdding(true)} style={{marginTop:16,width:"100%",background:C.surface,border:`1px dashed ${C.muted}`,borderRadius:14,padding:16,color:C.sub,fontSize:13,cursor:"pointer",fontWeight:700}}>+ Ajouter un créneau</button>
+            :<AddBlockForm onAdd={addBlock} onCancel={()=>setAdding(false)} freeSlots={freeSlots}/>
+          }
+        </>
+      }
+    </div>
+  </div>;
+}
+
+function AddBlockForm({onAdd,onCancel,freeSlots}){
+  const[type,setType]=useState("habit");
+  const[label,setLabel]=useState("");
+  const[icon,setIcon]=useState("📋");
+  const[color,setColor]=useState(C.violet);
+  const[start,setStart]=useState("08:00");
+  const[end,setEnd]=useState("09:00");
+  const[customMode,setCustomMode]=useState(false);
+
+  const presets=type==="habit"?HABIT_PRESETS:type==="epic"?EPIC_PRESETS:[];
+
+  const selectPreset=(p)=>{setLabel(p.label);setIcon(p.icon);setColor(p.color);setCustomMode(false);};
+
+  const applySlot=(s)=>{setStart(minToTime(s.start));setEnd(minToTime(Math.min(s.start+60,s.end)));};
+
+  const handleAdd=()=>{
+    if(!label.trim())return;
+    if(timeToMin(end)<=timeToMin(start))return;
+    onAdd({type,label:label.trim(),icon,color,start,end});
+  };
+
+  return<Crd style={{marginTop:16,animation:"modalIn .3s ease"}}>
+    <Lbl>NOUVEAU CRÉNEAU</Lbl>
+
+    <div style={{display:"flex",gap:6,marginTop:12}}>
+      {Object.entries(BLOCK_TYPES).map(([k,t])=>(
+        <button key={k} onClick={()=>{setType(k);setLabel("");setCustomMode(false);}} style={{
+          flex:1,background:type===k?t.color:C.surface,color:type===k?"#fff":C.sub,
+          border:`1px solid ${type===k?t.color:C.border}`,borderRadius:10,
+          padding:"8px 4px",fontSize:11,fontWeight:700,cursor:"pointer"
+        }}>{t.icon} {t.label}</button>
+      ))}
+    </div>
+
+    {presets.length>0&&!customMode&&<div style={{marginTop:12}}>
+      <div style={{fontSize:11,color:C.sub,marginBottom:8}}>Choisis un préréglage ou personnalise :</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {presets.map(p=>(
+          <button key={p.label} onClick={()=>selectPreset(p)} style={{
+            background:label===p.label?p.color+"33":C.surface,
+            border:`1px solid ${label===p.label?p.color:C.border}`,
+            borderRadius:20,padding:"6px 12px",fontSize:12,color:C.text,cursor:"pointer"
+          }}>{p.icon} {p.label}</button>
+        ))}
+        <button onClick={()=>{setCustomMode(true);setLabel("");}} style={{
+          background:C.surface,border:`1px dashed ${C.muted}`,borderRadius:20,
+          padding:"6px 12px",fontSize:12,color:C.sub,cursor:"pointer"
+        }}>✏️ Personnalisé</button>
+      </div>
+    </div>}
+
+    {(type==="event"||customMode)&&<div style={{marginTop:12}}>
+      <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Nom du créneau</div>
+      <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Ex: RDV coiffeur, sortie avec Marc..." style={{...inSt,width:"100%"}}/>
+    </div>}
+
+    <div style={{display:"flex",gap:10,marginTop:14}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Début</div>
+        <input type="time" value={start} onChange={e=>setStart(e.target.value)} style={{...inSt,width:"100%"}}/>
+      </div>
+      <div style={{flex:1}}>
+        <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Fin</div>
+        <input type="time" value={end} onChange={e=>setEnd(e.target.value)} style={{...inSt,width:"100%"}}/>
+      </div>
+    </div>
+
+    {freeSlots&&freeSlots.filter(s=>s.end-s.start>=20).length>0&&<div style={{marginTop:12}}>
+      <div style={{fontSize:11,color:C.sub,marginBottom:6}}>💡 Suggestions de créneaux libres</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {freeSlots.filter(s=>s.end-s.start>=20).map((s,i)=>(
+          <button key={i} onClick={()=>applySlot(s)} style={{background:C.surface,border:`1px solid ${C.emerald}44`,borderRadius:10,padding:"5px 10px",fontSize:11,color:C.emerald,cursor:"pointer"}}>
+            {minToTime(s.start)}–{minToTime(s.end)}
+          </button>
+        ))}
+      </div>
+    </div>}
+
+    {timeToMin(end)<=timeToMin(start)&&<div style={{fontSize:11,color:C.rose,marginTop:8}}>⚠️ L'heure de fin doit être après l'heure de début</div>}
+
+    <div style={{display:"flex",gap:8,marginTop:14}}>
+      <Btn onClick={handleAdd} color={C.emerald} full>Ajouter au planning</Btn>
+      <Btn onClick={onCancel} color={C.muted}>Annuler</Btn>
+    </div>
+  </Crd>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
