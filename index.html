@@ -219,6 +219,7 @@ const mkDef=()=>({
   meditationStreak:0,readingStreak:0,tidyStreak:0,
   nocturneStreak:0,conscienceCleanStreak:0,proteinStreak:0,veggieStreak:0,
   history:[],
+  catBase:{corps:50,nutrition:50,cerveau:50,apparence:50,discipline:50,social:50},
   records:{bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0},
   weeklyChallenge:null, // {weekKey, cat, habitId, goal, current, xpReward, done, claimed}
   dailyXPGained:0, dailyXPDate:null,
@@ -273,20 +274,41 @@ function generateWeeklyChallenge(){
 
 const computeGlobalScore=s=>{
   const cs={};
+  const base=s.catBase||{};
+  Object.keys(CATS).forEach(cat=>{
+    const b=base[cat]!==undefined?base[cat]:50;
+    const impact=s.activityImpacts?.[cat]||0;
+    cs[cat]=Math.max(0,Math.min(100,Math.round(b+impact)));
+  });
+  const gs=Math.round(Object.values(cs).reduce((a,b)=>a+b,0)/Object.keys(CATS).length);
+  return{cs,gs};
+};
+
+// Habits still track their own completion % for the Habitudes tab display (XP/streaks unaffected)
+const computeHabitCompletion=s=>{
+  const hc={};
   Object.keys(CATS).forEach(cat=>{
     const all=[...CORE.filter(h=>h.cat===cat),...BONUS.filter(h=>h.cat===cat)];
-    if(!all.length){cs[cat]=0;return;}
+    if(!all.length){hc[cat]=0;return;}
     const tot=all.reduce((a,h)=>{
       if(h.unit==="check")return a+pct(Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length,h.goal);
       if(h.id==="sleep")return a+pct(calcSleep(s.sleepBedtime,s.sleepWake),SG);
       const pg=BONUS.find(b=>b.id===h.id)?(s.bonusProgress?.[h.id]||0):(s.coreProgress?.[h.id]||0);
       return a+pct(pg,h.goal);
     },0);
-    cs[cat]=Math.round(tot/all.length);
+    hc[cat]=Math.round(tot/all.length);
   });
-  Object.keys(cs).forEach(k=>{cs[k]=Math.max(0,Math.min(100,cs[k]+(s.activityImpacts?.[k]||0)));});
-  const gs=Math.round(Object.values(cs).reduce((a,b)=>a+b,0)/Object.keys(CATS).length);
-  return{cs,gs};
+  return hc;
+};
+
+// Compute tomorrow's morning starting base per category: drift halfway toward 50 from today's end-of-day score
+const computeNextDayBase=(cs)=>{
+  const next={};
+  Object.keys(CATS).forEach(cat=>{
+    const today=cs[cat]??50;
+    next[cat]=Math.round(today+(50-today)*0.4); // 40% drift toward neutral 50
+  });
+  return next;
 };
 
 const chkBadges=s=>{
@@ -625,6 +647,7 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
     {/* Category scores */}
     <Crd>
       <Lbl>PAR CATÉGORIE</Lbl>
+      <div style={{fontSize:11,color:C.sub,marginTop:4}}>Basé sur ce que tu notes dans le Journal — pas sur tes habitudes cochées.</div>
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
         {Object.entries(CATS).map(([k,cat])=>{
           const bonus=s.activityImpacts?.[k]||0;
@@ -1229,9 +1252,68 @@ function Journal({s,update,showT}){
 
 // ── SETTINGS ──
 function Settings({s,update,showT}){
+  const fileInputRef=useRef(null);
   const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},activities:[],activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
   const ra=()=>{update(()=>({...mkDef(),weeklyChallenge:generateWeeklyChallenge()}));showT("Données effacées",C.red);};
+
+  const exportData=()=>{
+    try{
+      const dataStr=JSON.stringify(s,null,2);
+      const blob=new Blob([dataStr],{type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      const dateStr=TODAY();
+      a.href=url;
+      a.download=`amaury-quest-backup-${dateStr}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showT("💾 Sauvegarde téléchargée !",C.emerald);
+    }catch(e){showT("Erreur d'export",C.red);}
+  };
+
+  const triggerImport=()=>{fileInputRef.current?.click();};
+
+  const handleImportFile=(e)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      try{
+        const parsed=JSON.parse(ev.target.result);
+        if(typeof parsed.xp!=="number"){showT("Fichier invalide",C.red);return;}
+        // Merge with defaults to fill any missing fields from older backups
+        const merged={...mkDef(),...parsed};
+        if(!merged.weeklyChallenge||merged.weeklyChallenge.weekKey!==getWeekKey()){
+          merged.weeklyChallenge=generateWeeklyChallenge();
+        }
+        update(()=>merged);
+        showT("✅ Sauvegarde restaurée !",C.emerald,3000);
+      }catch(err){showT("Erreur : fichier corrompu",C.red);}
+    };
+    reader.readAsText(file);
+    e.target.value="";
+  };
+
   return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <Crd style={{border:`1px solid ${C.sky}40`}}>
+      <Lbl>💾 SAUVEGARDE</Lbl>
+      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:12,lineHeight:1.5}}>
+        Tes données sont stockées uniquement sur cet appareil. Exporte régulièrement une sauvegarde pour ne rien perdre — surtout avant un voyage !
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:6}}>Télécharge toutes tes données dans un fichier</div>
+          <Btn onClick={exportData} color={C.sky} full>⬇️ Exporter ma sauvegarde</Btn>
+        </div>
+        <div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:6}}>Restaure une sauvegarde précédente (remplace les données actuelles)</div>
+          <Btn onClick={triggerImport} color={C.violet} full>⬆️ Importer une sauvegarde</Btn>
+          <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={handleImportFile} style={{display:"none"}}/>
+        </div>
+      </div>
+    </Crd>
     <div style={{fontSize:12,color:C.sub}}>⚠️ Zone sensible.</div>
     <Crd style={{border:`1px solid ${C.red}40`}}>
       <Lbl>ACTIONS</Lbl>
@@ -1358,6 +1440,7 @@ function App(){
           p.coreProgress={};p.bonusProgress={};p.checklistProgress={};
           p.sleepBedtime=null;p.sleepWake=null;
           p.eveningDone=false;p.eveningNote={good:"",improve:""};
+          p.catBase=computeNextDayBase(dayCats);
           p.activities=[];p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
           p.todayKey=TODAY();
           const nb=chkBadges(p);if(nb.length){p.unlockedBadges=[...(p.unlockedBadges||[]),...nb];p.newBadges=nb;}
@@ -1365,6 +1448,7 @@ function App(){
         if(!p.activities)p.activities=[];
         if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
         if(!p.history)p.history=[];
+        if(!p.catBase)p.catBase={corps:50,nutrition:50,cerveau:50,apparence:50,discipline:50,social:50};
         if(!p.records)p.records={bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0};
         if(!p.weeklyChallenge||p.weeklyChallenge.weekKey!==getWeekKey())p.weeklyChallenge=generateWeeklyChallenge();
         if(p.dailyXPGained===undefined)p.dailyXPGained=0;
