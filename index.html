@@ -473,6 +473,13 @@ function analyzeActivity(text){
     // Duration multiplier: base is 30min
     const mul=Math.min(mins/30, 6); // cap at 6x (3h)
 
+    // Intensity detection for sport activities (léger/modéré/intense)
+    const intenseWords=["intense","hiit","a fond","tres dur","killer","explosif","max effort","a bloc"];
+    const lightWords=["leger","légere","tranquille","doux","recup","récup","cool","facile","balade"];
+    const isIntense=intenseWords.some(w=>t.includes(w));
+    const isLight=lightWords.some(w=>t.includes(w));
+    const sportIntensityMul=isIntense?1.35:isLight?0.7:1;
+
     // Late-night detection
     const lateNight=/\b(tard|nuit|minuit|3h|2h|1h du mat|insomnie)\b/.test(t);
 
@@ -518,20 +525,118 @@ function analyzeActivity(text){
       return;
     }
 
+    // === FOOD DATABASE (per 100g) — kcal, protein, carbs, fat, fiber, sugar ===
+    const FOOD_DB=[
+      {k:["poulet","blanc de poulet","escalope de poulet"],kcal:165,p:31,c:0,f:3.6,fi:0,su:0},
+      {k:["dinde","escalope de dinde"],kcal:135,p:29,c:0,f:1,fi:0,su:0},
+      {k:["boeuf","steak","boeuf hache","steak hache"],kcal:250,p:26,c:0,f:17,fi:0,su:0},
+      {k:["saumon"],kcal:208,p:20,c:0,f:13,fi:0,su:0},
+      {k:["thon"],kcal:132,p:28,c:0,f:1,fi:0,su:0},
+      {k:["oeuf","oeufs"],kcal:155,p:13,c:1.1,f:11,fi:0,su:1.1},
+      {k:["riz","riz blanc","riz complet","riz basmati"],kcal:130,p:2.7,c:28,f:0.3,fi:0.4,su:0.1},
+      {k:["pates","pâtes","spaghetti","penne"],kcal:131,p:5,c:25,f:1.1,fi:1.8,su:0.6},
+      {k:["pain","baguette","tranche de pain"],kcal:265,p:9,c:49,f:3.2,fi:2.7,su:5},
+      {k:["patate","pomme de terre","pommes de terre"],kcal:77,p:2,c:17,f:0.1,fi:2.2,su:0.8},
+      {k:["patate douce","pommes de terre douce"],kcal:86,p:1.6,c:20,f:0.1,fi:3,su:4.2},
+      {k:["quinoa"],kcal:120,p:4.4,c:21,f:1.9,fi:2.8,su:0.9},
+      {k:["avoine","flocons d'avoine","porridge"],kcal:389,p:16.9,c:66,f:6.9,fi:10.6,su:0},
+      {k:["fromage blanc","skyr"],kcal:75,p:11,c:4,f:0.5,fi:0,su:4},
+      {k:["yaourt","yaourt nature"],kcal:61,p:3.5,c:4.7,f:3.3,fi:0,su:4.7},
+      {k:["lait"],kcal:42,p:3.4,c:5,f:1,fi:0,su:5},
+      {k:["fromage"],kcal:350,p:25,c:1.3,f:28,fi:0,su:0.5},
+      {k:["banane"],kcal:89,p:1.1,c:23,f:0.3,fi:2.6,su:12},
+      {k:["pomme"],kcal:52,p:0.3,c:14,f:0.2,fi:2.4,su:10},
+      {k:["fraise","fraises"],kcal:32,p:0.7,c:7.7,f:0.3,fi:2,su:4.9},
+      {k:["orange"],kcal:47,p:0.9,c:12,f:0.1,fi:2.4,su:9.4},
+      {k:["brocoli"],kcal:34,p:2.8,c:7,f:0.4,fi:2.6,su:1.7},
+      {k:["carotte","carottes"],kcal:41,p:0.9,c:10,f:0.2,fi:2.8,su:4.7},
+      {k:["salade","laitue"],kcal:15,p:1.4,c:2.9,f:0.2,fi:1.3,su:0.8},
+      {k:["tomate","tomates"],kcal:18,p:0.9,c:3.9,f:0.2,fi:1.2,su:2.6},
+      {k:["haricot vert","haricots verts"],kcal:31,p:1.8,c:7,f:0.2,fi:3.4,su:3.3},
+      {k:["lentilles"],kcal:116,p:9,c:20,f:0.4,fi:7.9,su:1.8},
+      {k:["pois chiche","pois chiches"],kcal:164,p:8.9,c:27,f:2.6,fi:7.6,su:4.8},
+      {k:["amande","amandes"],kcal:579,p:21,c:22,f:50,fi:12.5,su:4.4},
+      {k:["noix"],kcal:654,p:15,c:14,f:65,fi:6.7,su:2.6},
+      {k:["cacahuete","cacahuetes","beurre de cacahuete"],kcal:588,p:25,c:20,f:50,fi:8,su:5},
+      {k:["huile d'olive","huile"],kcal:884,p:0,c:0,f:100,fi:0,su:0},
+      {k:["avocat"],kcal:160,p:2,c:9,f:15,fi:6.7,su:0.7},
+      {k:["chocolat","chocolat noir"],kcal:546,p:4.9,c:61,f:31,fi:7,su:48},
+      {k:["pizza"],kcal:266,p:11,c:33,f:10,fi:2.3,su:3.6},
+      {k:["burger"],kcal:295,p:17,c:24,f:14,fi:1.3,su:5},
+      {k:["frites","frite"],kcal:312,p:3.4,c:41,f:15,fi:3.8,su:0.3},
+      {k:["kebab"],kcal:250,p:15,c:20,f:12,fi:1.5,su:2},
+      {k:["chips"],kcal:536,p:6.6,c:53,f:34,fi:4.4,su:0.2},
+      {k:["glace"],kcal:207,p:3.5,c:24,f:11,fi:0.7,su:21},
+      {k:["gateau","gâteau"],kcal:350,p:5,c:50,f:15,fi:1,su:30},
+      {k:["bonbon","bonbons"],kcal:390,p:0,c:98,f:0.2,fi:0,su:75},
+      {k:["shake proteine","whey","proteine en poudre"],kcal:400,p:80,c:8,f:5,fi:1,su:4},
+      {k:["pate a tartiner","nutella"],kcal:539,p:6.3,c:57,f:31,fi:3.4,su:56},
+    ];
+
+    // === Detect food entries with grams and compute macro totals ===
+    const gramMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*g(?:r|rammes?)?\b/g)];
+    let macroTotals=null;
+    if(gramMatches.length>0){
+      macroTotals={kcal:0,p:0,c:0,f:0,fi:0,su:0,matched:false};
+      for(const food of FOOD_DB){
+        for(const kw of food.k){
+          const idx=t.indexOf(kw);
+          if(idx===-1)continue;
+          // find the nearest gram quantity to this keyword occurrence (before or shortly after)
+          let bestGram=null,bestDist=Infinity;
+          for(const gm of gramMatches){
+            const dist=Math.abs(gm.index-idx);
+            if(dist<bestDist&&dist<25){bestDist=dist;bestGram=parseFloat(gm[1].replace(",","."));}
+          }
+          if(bestGram){
+            const ratio=bestGram/100;
+            macroTotals.kcal+=food.kcal*ratio;
+            macroTotals.p+=food.p*ratio;
+            macroTotals.c+=food.c*ratio;
+            macroTotals.f+=food.f*ratio;
+            macroTotals.fi+=food.fi*ratio;
+            macroTotals.su+=food.su*ratio;
+            macroTotals.matched=true;
+          }
+        }
+      }
+    }
+
+    if(macroTotals&&macroTotals.matched){
+      // Daily targets for Amaury: 18yo, 1m87, 72kg, lean bulk
+      const T={kcal:2800,p:155,c:325,f:80,fi:30,suMax:50};
+      // Score each macro as a fraction of its daily target contribution (this single meal's worth)
+      const pScore=Math.min(1,macroTotals.p/T.p)*22; // protein matters most
+      const kcalRatio=macroTotals.kcal/T.kcal;
+      const kcalScore=(kcalRatio>0&&kcalRatio<0.6)?kcalRatio*15:15-Math.abs(kcalRatio-0.35)*10; // reasonable single-meal share
+      const fiScore=Math.min(1,macroTotals.fi/T.fi)*8;
+      const sugarPenalty=macroTotals.su>25?-Math.min(15,(macroTotals.su-25)*0.5):0;
+      const fatRatio=macroTotals.f/T.f;
+      const fatScore=fatRatio<0.5?4:fatRatio<0.8?2:-3;
+      const nutritionImpact=Math.round(Math.max(-15,Math.min(20,pScore*0.6+Math.max(0,kcalScore)*0.5+fiScore*0.6+fatScore+sugarPenalty)));
+      resolve({
+        ...Z,
+        nutrition:nutritionImpact,
+        corps:Math.round(nutritionImpact*0.25),
+        _macros:{kcal:Math.round(macroTotals.kcal),p:Math.round(macroTotals.p),c:Math.round(macroTotals.c),f:Math.round(macroTotals.f),fi:Math.round(macroTotals.fi),su:Math.round(macroTotals.su)},
+      });
+      return;
+    }
+
     // Activity database: {keywords[], impacts per 30min}
     const DB=[
       // === SPORT & CORPS ===
-      {k:["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche"],i:{...Z,corps:12,cerveau:1,apparence:3,discipline:8}},
-      {k:["course","courir","jogging","sprint","cardio","run"],i:{...Z,corps:11,cerveau:2,apparence:2,discipline:7}},
-      {k:["foot","football","futsal","match"],i:{...Z,corps:10,cerveau:3,apparence:1,discipline:6,social:5}},
-      {k:["basket","basketball","tennis","badminton","ping","pong","natation","nager","velo","cyclisme","boxe","mma","judo","karate","sport"],i:{...Z,corps:9,cerveau:2,apparence:1,discipline:6}},
-      {k:["marche","marcher","balade","balader","promenade","promener"],i:{...Z,corps:5,cerveau:3,discipline:3}},
-      {k:["randonnee","randonner","foret","montagne","nature","hiking"],i:{...Z,corps:7,cerveau:5,discipline:4}},
-      {k:["etirement","etirer","stretching","yoga","souplesse","mobilite"],i:{...Z,corps:5,cerveau:2,apparence:1,discipline:5}},
+      {k:["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche"],i:{...Z,corps:12,cerveau:1,apparence:3,discipline:8},sport:true},
+      {k:["course","courir","jogging","sprint","cardio","run","hiit"],i:{...Z,corps:11,cerveau:2,apparence:2,discipline:7},sport:true},
+      {k:["foot","football","futsal","match"],i:{...Z,corps:10,cerveau:3,apparence:1,discipline:6,social:5},sport:true},
+      {k:["basket","basketball","tennis","badminton","ping","pong","natation","nager","velo","cyclisme","boxe","mma","judo","karate","crossfit","spinning"],i:{...Z,corps:9,cerveau:2,apparence:1,discipline:6},sport:true},
+      {k:["marche","marcher","balade","balader","promenade","promener"],i:{...Z,corps:5,cerveau:3,discipline:3},sport:true},
+      {k:["randonnee","randonner","foret","montagne","nature","hiking"],i:{...Z,corps:7,cerveau:5,discipline:4},sport:true},
+      {k:["etirement","etirer","stretching","yoga","souplesse","mobilite","pilates"],i:{...Z,corps:5,cerveau:2,apparence:1,discipline:5},sport:true},
       {k:["sieste","dormi","dors","sommeil"],i:{...Z,corps:4,cerveau:3,apparence:2,discipline:-1}},
-      {k:["danse","danser"],i:{...Z,corps:8,cerveau:2,apparence:3,discipline:4,social:4}},
+      {k:["danse","danser"],i:{...Z,corps:8,cerveau:2,apparence:3,discipline:4,social:4},sport:true},
 
-      // === NUTRITION ===
+      // === NUTRITION (fallback for text without grams) ===
       {k:["cuisine","cuisiné","prépare","repas","fait a manger","cook"],i:{...Z,corps:2,nutrition:8,cerveau:3,apparence:1,discipline:6}},
       {k:["legume","legumes","salade","brocoli","carotte","epinard","courgette","tomate","concombre","poivron"],i:{...Z,corps:2,nutrition:10,apparence:3,discipline:3}},
       {k:["fruit","pomme","banane","orange","fraise","myrtille","mangue","kiwi","raisin"],i:{...Z,corps:2,nutrition:9,apparence:3,discipline:2}},
@@ -542,18 +647,21 @@ function analyzeActivity(text){
       {k:["eau","hydrat"],i:{...Z,corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2}},
 
       // === CERVEAU ===
-      {k:["livre","lire","lu","lecture","roman","bouquin"],i:{...Z,cerveau:10,discipline:6}},
-      {k:["echecs","chess","jeu de reflexion","sudoku","puzzle","enigme"],i:{...Z,cerveau:10,discipline:6}},
-      {k:["japonais","kanji","hiragana","katakana","duolingo","langue","apprendre"],i:{...Z,cerveau:11,discipline:7}},
+      {k:["livre","lire","lu","lecture","roman","bouquin","bd","manga","essai"],i:{...Z,cerveau:10,discipline:6}},
+      {k:["echecs en ligne","chess.com","lichess","echecs online"],i:{...Z,cerveau:11,discipline:5,social:3}},
+      {k:["echecs","chess","jeu de reflexion","sudoku","puzzle","enigme","mots croises","scrabble"],i:{...Z,cerveau:10,discipline:6}},
+      {k:["japonais","kanji","hiragana","katakana","duolingo","langue","apprendre","vocabulaire"],i:{...Z,cerveau:11,discipline:7}},
       {k:["documentaire","docu","reportage"],i:{...Z,cerveau:8,discipline:3}},
-      {k:["podcast","conference","ted","cours en ligne","mooc","formation"],i:{...Z,cerveau:8,discipline:5}},
+      {k:["podcast educatif","podcast eduquant"],i:{...Z,cerveau:9,discipline:5}},
+      {k:["podcast","conference","ted","ted talk","cours en ligne","mooc","formation","webinaire"],i:{...Z,cerveau:8,discipline:5}},
       {k:["dessin","dessiner","sketch","croquis","illustrer","illustré","aquarelle","peinture","peindre"],i:{...Z,cerveau:7,apparence:2,discipline:5}},
       {k:["coder","programmer","code","dev","développer","javascript","python","html"],i:{...Z,cerveau:11,discipline:7}},
-      {k:["ecrire","rediger","journal","blog","dissertation"],i:{...Z,cerveau:8,discipline:5}},
-      {k:["music","musique","guitare","piano","instrument","jouer de"],i:{...Z,cerveau:7,apparence:1,discipline:6}},
+      {k:["ecrire","rediger","journal","blog","dissertation","poeme","poésie"],i:{...Z,cerveau:8,discipline:5}},
+      {k:["apprendre la guitare","apprentissage guitare","apprendre le piano","apprentissage piano","cours de musique","gamme","solfege"],i:{...Z,cerveau:9,apparence:1,discipline:7}},
+      {k:["music","musique","guitare","piano","instrument","jouer de","batterie","violon","chant","chanter"],i:{...Z,cerveau:7,apparence:1,discipline:6}},
       {k:["meditation","mediter","pleine conscience","mindfulness","respiration"],i:{...Z,corps:2,cerveau:7,discipline:8}},
       {k:["prier","priere","spirituel"],i:{...Z,cerveau:4,discipline:5}},
-      {k:["géographie","histoire","science","biologie","physique","chimie","maths","revise","révision"],i:{...Z,cerveau:9,discipline:7}},
+      {k:["géographie","histoire","science","biologie","physique","chimie","maths","revise","révision","etude","étude"],i:{...Z,cerveau:9,discipline:7}},
 
       // === APPARENCE / STYLE ===
       {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{...Z,cerveau:1,apparence:7,discipline:2}},
@@ -600,11 +708,12 @@ function analyzeActivity(text){
       return;
     }
 
-    // Apply duration multiplier and round
+    // Apply duration multiplier (and intensity for sport entries) and round
     const raw=bestMatch.i;
+    const effMul=bestMatch.sport?mul*sportIntensityMul:mul;
     const result={};
     for(const k of Object.keys(Z)){
-      const v=(raw[k]||0)*mul;
+      const v=(raw[k]||0)*effMul;
       result[k]=Math.round(Math.max(-20,Math.min(20,v)));
     }
     resolve(result);
@@ -676,6 +785,18 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
       </div>
       <Br val={gs} max={100} color={getScoreColor(gs)} glow/>
     </Crd>
+
+    {/* No activity logged today reminder */}
+    {(!s.activities||s.activities.length===0)&&<div style={{
+      background:`${C.amber}14`,border:`1px solid ${C.amber}40`,borderRadius:14,
+      padding:"12px 14px",display:"flex",alignItems:"center",gap:10
+    }}>
+      <span style={{fontSize:20}}>✏️</span>
+      <div>
+        <div style={{fontSize:12,fontWeight:700,color:C.amber}}>Rien noté dans le Journal aujourd'hui</div>
+        <div style={{fontSize:11,color:C.sub,marginTop:2}}>Ton score va doucement dériver vers 50% tant que tu n'as rien logué.</div>
+      </div>
+    </div>}
 
     {/* Category scores — constellation of rings */}
     <Crd>
@@ -1115,8 +1236,9 @@ function Journal({s,update,showT}){
     if(!input.trim())return;
     setLoading(true);
     try{
-      const impacts=await analyzeActivity(input.trim());
-      const activity={id:Date.now(),text:input.trim(),impacts,originalImpacts:impacts,adjusted:false,time:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
+      const raw=await analyzeActivity(input.trim());
+      const{_macros,...impacts}=raw;
+      const activity={id:Date.now(),text:input.trim(),impacts,originalImpacts:impacts,adjusted:false,macros:_macros||null,time:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
       update(p=>{
         const newActivities=[...(p.activities||[]),activity];
         const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
@@ -1165,6 +1287,13 @@ function Journal({s,update,showT}){
   const redeem=r=>{if(s.debt<=0){showT("Aucune dette !",C.sub);return;}update(p=>({...p,debt:Math.max(0,p.debt-r.r)}));showT(`${r.icon} Rachat ! -${r.r} dette`,C.emerald);};
 
   const todayActs=(s.activities||[]);
+  const macroTotals=todayActs.reduce((acc,a)=>{
+    if(!a.macros)return acc;
+    acc.kcal+=a.macros.kcal;acc.p+=a.macros.p;acc.c+=a.macros.c;acc.f+=a.macros.f;acc.fi+=a.macros.fi;acc.su+=a.macros.su;
+    return acc;
+  },{kcal:0,p:0,c:0,f:0,fi:0,su:0});
+  const hasMacros=macroTotals.kcal>0;
+  const TARGETS={kcal:2800,p:155,c:325,f:80,fi:30};
   const todayFaults=(s.conscience||[]).filter(e=>e.date===TODAY());
 
   return<div style={{display:"flex",flexDirection:"column",gap:14,}}>
@@ -1182,7 +1311,7 @@ function Journal({s,update,showT}){
         <textarea
           value={input}
           onChange={e=>setInput(e.target.value)}
-          placeholder="Ex: joué aux échecs 1h, scrollé TikTok 45 min, fait 50 pompes, lu un manga..."
+          placeholder="Ex: 150g de poulet et 200g de riz, joué aux échecs 1h, scrollé TikTok 45 min, fait 50 pompes..."
           style={{...tS,height:72}}
         />
         <div style={{marginTop:10}}>
@@ -1207,6 +1336,13 @@ function Journal({s,update,showT}){
                     {Object.entries(a.impacts).filter(([,v])=>v!==0).map(([k,v])=><ImpactPill key={k} cat={k} val={v}/>)}
                   </div>}
                   {!isEditing&&!hasImpact&&<span style={{fontSize:11,color:C.sub}}>Aucun impact significatif détecté</span>}
+                  {!isEditing&&a.macros&&<div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:8,fontSize:10,color:C.sub}}>
+                    <span>🔥 {a.macros.kcal}kcal</span>
+                    <span>🥩 {a.macros.p}g prot</span>
+                    <span>🍚 {a.macros.c}g gluc</span>
+                    <span>🥑 {a.macros.f}g lip</span>
+                    {a.macros.su>0&&<span style={{color:a.macros.su>25?C.rose:C.sub}}>🍬 {a.macros.su}g sucre</span>}
+                  </div>}
                 </div>
                 {!isEditing&&<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
                   <span style={{fontSize:10,color:C.sub}}>{a.time}</span>
@@ -1237,6 +1373,34 @@ function Journal({s,update,showT}){
               </div>}
             </div>;
           })}
+        </div>
+      </Crd>}
+
+      {hasMacros&&<Crd>
+        <Lbl>🍽️ BILAN NUTRITIONNEL DU JOUR</Lbl>
+        <div style={{display:"flex",alignItems:"baseline",gap:8,marginTop:10}}>
+          <span style={{fontSize:26,fontWeight:900,color:C.amber}}>{Math.round(macroTotals.kcal)}</span>
+          <span style={{fontSize:12,color:C.sub}}>/ {TARGETS.kcal} kcal</span>
+        </div>
+        <div style={{marginTop:6}}><Br val={macroTotals.kcal} max={TARGETS.kcal} color={C.amber}/></div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:14}}>
+          {[
+            {label:"Protéines",val:macroTotals.p,target:TARGETS.p,color:C.violet,icon:"🥩"},
+            {label:"Glucides",val:macroTotals.c,target:TARGETS.c,color:C.sky,icon:"🍚"},
+            {label:"Lipides",val:macroTotals.f,target:TARGETS.f,color:C.gold,icon:"🥑"},
+            {label:"Fibres",val:macroTotals.fi,target:TARGETS.fi,color:C.emerald,icon:"🌾"},
+          ].map(m=>(
+            <div key={m.label}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
+                <span>{m.icon} {m.label}</span>
+                <span style={{color:C.sub}}>{Math.round(m.val)}g / {m.target}g</span>
+              </div>
+              <Br val={m.val} max={m.target} color={m.color} h={5}/>
+            </div>
+          ))}
+          {macroTotals.su>0&&<div style={{marginTop:4,fontSize:11,color:macroTotals.su>50?C.rose:C.sub}}>
+            🍬 {Math.round(macroTotals.su)}g de sucre {macroTotals.su>50?"— au-dessus du plafond conseillé (50g)":""}
+          </div>}
         </div>
       </Crd>}
 
