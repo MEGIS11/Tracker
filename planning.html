@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="Amaury's Planning"/>
 <title>Amaury's Planning</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -12,17 +12,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:#07070d;font-family:'Inter',system-ui,sans-serif;color:#eeeeff;overscroll-behavior:none;}
-input,textarea,select{outline:none;color:#eeeeff;font-family:inherit;}
+body{background:#ffffff;font-family:'Inter',system-ui,sans-serif;color:#1a1a2e;overscroll-behavior:none;}
+input,textarea,select{outline:none;color:#1a1a2e;font-family:inherit;}
 button{font-family:inherit;}
 button:active{opacity:.8;}
 ::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-thumb{background:#2a2a45;border-radius:4px;}
+::-webkit-scrollbar-thumb{background:#f3d0dc;border-radius:4px;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pop{from{opacity:0;transform:translateX(-50%) scale(.7)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 @keyframes modalIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
-@keyframes blockIn{from{opacity:0;transform:scaleY(0.7);transform-origin:top}to{opacity:1;transform:scaleY(1)}}
-@keyframes pulseWarn{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes blockIn{from{opacity:0;transform:scale(0.92)}to{opacity:1;transform:scale(1)}}
+@keyframes pulseWarn{0%,100%{opacity:1}50%{opacity:.55}}
 @keyframes slideTab{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}
 </style>
 </head>
@@ -31,61 +31,64 @@ button:active{opacity:.8;}
 <script type="text/babel">
 const {useState,useEffect,useCallback,useRef,useMemo}=React;
 
+// ═══ PALETTE — light, Structured-inspired, rose/blanc ═══
 const C={
-  bg:"#07070d",surface:"#0e0e18",card:"#131320",card2:"#191928",
-  border:"#20203a",muted:"#2c2c4a",dim:"#33335a",
-  text:"#eeeeff",sub:"#6a6aa8",
-  purple:"#7c3aed",violet:"#a78bfa",indigo:"#6366f1",
-  green:"#10b981",emerald:"#34d399",
-  yellow:"#f59e0b",gold:"#fbbf24",
-  red:"#e11d48",rose:"#f43f5e",
-  blue:"#0ea5e9",sky:"#38bdf8",
-  orange:"#ea580c",amber:"#fb923c",
-  pink:"#db2777",fuchsia:"#f472b6",
+  bg:"#ffffff",surface:"#fdf6f8",card:"#ffffff",card2:"#fff8fa",
+  border:"#f5dde5",muted:"#fbe4ea",dim:"#f7e6eb",
+  text:"#241521",sub:"#9c8592",
+  rose:"#ff5c8a",rosePale:"#ffd6e3",roseDeep:"#e0356f",
+  coral:"#ff7a6e",peach:"#ffb199",
+  violet:"#a685e8",lavender:"#e4d6fb",
+  green:"#3ecf8e",emeraldPale:"#d3f5e6",
+  yellow:"#ffc542",goldPale:"#ffedc2",
+  blue:"#4fb6f0",skyPale:"#d9f0fd",
+  sub2:"#6e5a67",
 };
 
-const SK="amaury-planning-v2";
+const SK="amaury-planning-v3";
 const TODAY=()=>new Date().toISOString().slice(0,10);
 const TOMORROW=()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);};
 const dateKey=(d)=>d.toISOString().slice(0,10);
 
+// Category colors mirror the Tracker exactly
+const CATS={
+  corps:{label:"Corps",icon:"💪",color:C.violet,bg:C.lavender},
+  nutrition:{label:"Nutrition",icon:"🥗",color:C.green,bg:C.emeraldPale},
+  cerveau:{label:"Cerveau",icon:"🧠",color:C.blue,bg:C.skyPale},
+  apparence:{label:"Apparence",icon:"✨",color:C.yellow,bg:C.goldPale},
+  discipline:{label:"Discipline",icon:"🎯",color:C.rose,bg:C.rosePale},
+  autre:{label:"Autre",icon:"📌",color:C.coral,bg:"#ffe4df"},
+};
+
 const HABIT_PRESETS=[
-  {label:"Hydratation",icon:"💧",color:C.sky,cat:"corps"},
-  {label:"Séance Gym",icon:"🏋️",color:C.violet,cat:"corps"},
-  {label:"Sommeil",icon:"😴",color:C.purple,cat:"corps"},
-  {label:"Protéines",icon:"🥩",color:C.amber,cat:"nutrition"},
-  {label:"Fruits & Légumes",icon:"🥦",color:C.emerald,cat:"nutrition"},
-  {label:"Japonais",icon:"🎌",color:C.fuchsia,cat:"cerveau"},
-  {label:"Lecture",icon:"📚",color:C.gold,cat:"cerveau"},
-  {label:"Routine apparence",icon:"✨",color:C.amber,cat:"apparence"},
-  {label:"Lever tôt",icon:"🌅",color:C.gold,cat:"discipline"},
-  {label:"Méditation",icon:"🧘",color:C.emerald,cat:"discipline"},
-  {label:"One Piece",icon:"🏴‍☠️",color:C.red,cat:"discipline"},
-  {label:"Étirements",icon:"🤸",color:C.emerald,cat:"corps"},
-  {label:"Dessin",icon:"🎨",color:C.fuchsia,cat:"cerveau"},
-  {label:"Ranger",icon:"🧹",color:C.sub,cat:"discipline"},
-  {label:"Cuisiner",icon:"🍳",color:C.amber,cat:"discipline"},
+  {label:"Hydratation",icon:"💧",cat:"corps"},
+  {label:"Séance Gym",icon:"🏋️",cat:"corps"},
+  {label:"Sommeil",icon:"😴",cat:"corps"},
+  {label:"Protéines",icon:"🥩",cat:"nutrition"},
+  {label:"Fruits & Légumes",icon:"🥦",cat:"nutrition"},
+  {label:"Japonais",icon:"🎌",cat:"cerveau"},
+  {label:"Lecture",icon:"📚",cat:"cerveau"},
+  {label:"Routine apparence",icon:"✨",cat:"apparence"},
+  {label:"Lever tôt",icon:"🌅",cat:"discipline"},
+  {label:"Méditation",icon:"🧘",cat:"discipline"},
+  {label:"One Piece",icon:"🏴‍☠️",cat:"discipline"},
+  {label:"Étirements",icon:"🤸",cat:"corps"},
+  {label:"Dessin",icon:"🎨",cat:"cerveau"},
+  {label:"Ranger",icon:"🧹",cat:"discipline"},
+  {label:"Cuisiner",icon:"🍳",cat:"nutrition"},
 ];
 const EPIC_PRESETS=[
-  {label:"Backflip — entraînement",icon:"🤸",color:C.pink,cat:"corps"},
-  {label:"Cuisine — nouveau plat",icon:"🍽️",color:C.pink,cat:"nutrition"},
-  {label:"Japonais — vocabulaire",icon:"🎌",color:C.pink,cat:"cerveau"},
-  {label:"Carnet de croquis",icon:"🎨",color:C.pink,cat:"cerveau"},
-  {label:"Style — essayer une tenue",icon:"👔",color:C.pink,cat:"apparence"},
-  {label:"Tractions — entraînement",icon:"💪",color:C.pink,cat:"corps"},
+  {label:"Backflip — entraînement",icon:"🤸",cat:"corps"},
+  {label:"Cuisine — nouveau plat",icon:"🍽️",cat:"nutrition"},
+  {label:"Japonais — vocabulaire",icon:"🎌",cat:"cerveau"},
+  {label:"Carnet de croquis",icon:"🎨",cat:"cerveau"},
+  {label:"Style — essayer une tenue",icon:"👔",cat:"apparence"},
+  {label:"Tractions — entraînement",icon:"💪",cat:"corps"},
 ];
 const BLOCK_TYPES={
-  habit:{label:"Habitude",icon:"📋",color:C.violet},
-  epic:{label:"Quête épique",icon:"⚔️",color:C.fuchsia},
-  event:{label:"Événement",icon:"📌",color:C.sky},
-};
-const CATS={
-  corps:{label:"Corps",icon:"💪",color:C.violet},
-  nutrition:{label:"Nutrition",icon:"🥗",color:C.emerald},
-  cerveau:{label:"Cerveau",icon:"🧠",color:C.sky},
-  apparence:{label:"Apparence",icon:"✨",color:C.amber},
-  discipline:{label:"Discipline",icon:"🎯",color:C.fuchsia},
-  autre:{label:"Autre",icon:"📌",color:C.sub},
+  habit:{label:"Habitude",icon:"📋"},
+  epic:{label:"Quête épique",icon:"⚔️"},
+  event:{label:"Événement",icon:"📌"},
 };
 
 const mkDef=()=>({plans:{}});
@@ -117,30 +120,33 @@ function findFreeSlots(blocks,dayStart=6*60,dayEnd=24*60,minDuration=20){
   return slots;
 }
 
+const catOf=(b)=>{
+  const preset=[...HABIT_PRESETS,...EPIC_PRESETS].find(p=>p.label===b.label);
+  return preset?.cat||"autre";
+};
+
 const Crd=({children,style={}})=><div style={{
-  background:`linear-gradient(180deg, ${C.card2} 0%, ${C.card} 100%)`,
-  border:`1.5px solid ${C.border}`,borderRadius:18,padding:16,
-  boxShadow:`0 3px 0 rgba(0,0,0,0.35), 0 6px 16px -8px rgba(0,0,0,0.5)`,
+  background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:16,
+  boxShadow:"0 2px 10px -2px rgba(224,53,111,0.08)",
   ...style
 }}>{children}</div>;
 const Lbl=({children})=><div style={{fontSize:10,fontWeight:800,letterSpacing:2,color:C.sub,textTransform:"uppercase"}}>{children}</div>;
-const Btn=({children,onClick,color,full,small})=>{
-  const dk=[C.gold,C.emerald,C.amber,C.green].includes(color);
+const Btn=({children,onClick,color,full,small,textColor})=>{
   return<button onClick={onClick} style={{
-    background:color,color:dk?"#000":"#fff",border:"none",
-    borderRadius:small?9:12,padding:small?"6px 12px":"10px 16px",
+    background:color,color:textColor||"#fff",border:"none",
+    borderRadius:small?12:16,padding:small?"7px 14px":"12px 18px",
     fontWeight:800,fontSize:small?12:13,cursor:"pointer",
     width:full?"100%":"auto",flexShrink:0,
-    boxShadow:`0 3px 0 rgba(0,0,0,0.28)`,
+    boxShadow:`0 4px 12px -3px ${color}88`,
   }}>{children}</button>;
 };
-const inSt={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13};
+const inSt={background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:12,color:C.text,padding:"10px 14px",fontSize:14};
 
 // ═══════════════════ TIMELINE VIEW ═══════════════════
 function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHour=24}){
   const containerRef=useRef(null);
-  const [resizing,setResizing]=useState(null); // {id, startY, origEndMin, startMin}
-  const HOUR_H=64;
+  const [resizing,setResizing]=useState(null);
+  const HOUR_H=56;
   const totalMin=(endHour-startHour)*60;
   const totalH=(endHour-startHour)*HOUR_H;
 
@@ -162,7 +168,6 @@ function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHo
       const deltaY=clientY-resizing.startY;
       const deltaMin=Math.round((deltaY/HOUR_H*60)/5)*5;
       let newEndMin=resizing.origEndMin+deltaMin;
-      // Never let end go below start+15min, and cap at end of the visible day (endHour*60)
       newEndMin=Math.max(newEndMin,resizing.startMin+15);
       newEndMin=Math.min(newEndMin,endHour*60);
       onResize(resizing.id,minToTime(newEndMin));
@@ -187,52 +192,49 @@ function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHo
   },[resizing]);
 
   return<div ref={containerRef} style={{position:"relative",marginTop:8}}>
-    {/* Hour grid */}
     <div style={{position:"relative",height:totalH}}>
       {hours.map((h,i)=>(
         <div key={h} style={{position:"absolute",top:i*HOUR_H,left:0,right:0,height:HOUR_H,borderTop:`1px solid ${C.border}`,display:"flex"}}>
-          <div style={{width:42,flexShrink:0,fontSize:10,color:C.sub,transform:"translateY(-6px)",paddingRight:6,textAlign:"right"}}>{String(h).padStart(2,"0")}h</div>
+          <div style={{width:44,flexShrink:0,fontSize:10,color:C.sub,fontWeight:700,transform:"translateY(-6px)",paddingRight:8,textAlign:"right"}}>{String(h).padStart(2,"0")}h</div>
         </div>
       ))}
 
-      {/* Now line */}
-      {showNowLine&&<div style={{position:"absolute",top:nowY,left:42,right:0,height:2,background:C.rose,zIndex:5,boxShadow:`0 0 8px ${C.rose}`}}>
-        <div style={{position:"absolute",left:-5,top:-4,width:10,height:10,borderRadius:"50%",background:C.rose,boxShadow:`0 0 8px ${C.rose}`}}/>
+      {showNowLine&&<div style={{position:"absolute",top:nowY,left:44,right:0,height:2,background:C.roseDeep,zIndex:5}}>
+        <div style={{position:"absolute",left:-5,top:-4,width:10,height:10,borderRadius:"50%",background:C.roseDeep,boxShadow:`0 0 0 3px ${C.rosePale}`}}/>
       </div>}
 
-      {/* Blocks */}
       {blocks.map((b,idx)=>{
         const sMin=timeToMin(b.start),eMin=Math.max(timeToMin(b.end),sMin+15);
         const top=((sMin-startHour*60)/totalMin)*totalH;
-        const height=Math.max(((eMin-sMin)/totalMin)*totalH,26);
+        const height=Math.max(((eMin-sMin)/totalMin)*totalH,34);
         const isConflict=conflicts.has(b.id);
         const isResizingThis=resizing?.id===b.id;
+        const cat=CATS[catOf(b)];
         return<div key={b.id} style={{
-          position:"absolute",top,left:48,right:4,height,
-          background:b.done?`${C.emerald}18`:`${b.color}20`,
-          border:`1.5px solid ${isConflict?C.rose:b.done?C.emerald:b.color}`,
-          borderRadius:10,padding:"5px 8px",overflow:"visible",
-          animation:`blockIn .3s ease ${idx*0.03}s both`,
-          boxShadow:isConflict?`0 0 0 1px ${C.rose}66`:"none",
+          position:"absolute",top,left:50,right:2,height,
+          background:b.done?C.emeraldPale:cat.bg,
+          borderRadius:16,padding:"7px 10px",overflow:"visible",
+          animation:`blockIn .3s cubic-bezier(.34,1.2,.4,1) ${idx*0.03}s both`,
+          boxShadow:isConflict?`0 0 0 2px ${C.roseDeep}, 0 4px 10px -3px ${C.roseDeep}66`:`0 3px 8px -3px ${cat.color}55`,
           cursor:"pointer",zIndex:isResizingThis?10:isConflict?3:2,
+          borderLeft:`4px solid ${b.done?C.green:cat.color}`,
         }} onClick={()=>!resizing&&onToggle(b.id)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",height:"100%",overflow:"hidden"}}>
             <div style={{overflow:"hidden",flex:1}}>
-              <div style={{fontSize:11,fontWeight:700,color:b.done?C.emerald:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textDecoration:b.done?"line-through":"none"}}>
+              <div style={{fontSize:12,fontWeight:800,color:b.done?C.green:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",textDecoration:b.done?"line-through":"none"}}>
                 {b.icon} {b.label}
               </div>
-              {height>36&&<div style={{fontSize:9,color:C.sub,marginTop:2}}>{b.start}–{b.end}</div>}
-              {isConflict&&<div style={{fontSize:9,color:C.rose,fontWeight:700,marginTop:2,animation:"pulseWarn 1.5s infinite"}}>⚠️ Conflit</div>}
+              {height>40&&<div style={{fontSize:10,color:C.sub2,marginTop:2,fontWeight:600}}>{b.start}–{b.end}</div>}
+              {isConflict&&<div style={{fontSize:9,color:C.roseDeep,fontWeight:800,marginTop:2,animation:"pulseWarn 1.5s infinite"}}>⚠️ Conflit</div>}
             </div>
-            <button onClick={(e)=>{e.stopPropagation();onRemove(b.id);}} style={{background:C.bg+"88",border:"none",borderRadius:"50%",width:20,height:20,color:C.text,cursor:"pointer",fontSize:14,padding:0,lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:4}}>×</button>
+            <button onClick={(e)=>{e.stopPropagation();onRemove(b.id);}} style={{background:"rgba(255,255,255,0.7)",border:"none",borderRadius:"50%",width:20,height:20,color:C.roseDeep,cursor:"pointer",fontSize:13,fontWeight:900,padding:0,lineHeight:1,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:4}}>×</button>
           </div>
-          {/* Resize handle */}
           <div
             onMouseDown={(e)=>handlePointerDown(b,e.clientY,e)}
             onTouchStart={(e)=>handlePointerDown(b,e.touches[0].clientY,e)}
             style={{position:"absolute",bottom:-8,left:0,right:0,height:20,cursor:"ns-resize",display:"flex",alignItems:"center",justifyContent:"center",zIndex:11}}
           >
-            <div style={{width:28,height:4,borderRadius:2,background:isResizingThis?C.gold:`${b.color}aa`}}/>
+            <div style={{width:30,height:4,borderRadius:2,background:isResizingThis?C.roseDeep:`${cat.color}aa`}}/>
           </div>
         </div>;
       })}
@@ -252,15 +254,13 @@ function WeekView({plans,onSelectDay}){
     const blocks=plans[key]||[];
     const totals={};
     blocks.forEach(b=>{
-      const preset=[...HABIT_PRESETS,...EPIC_PRESETS].find(p=>p.label===b.label);
-      const cat=preset?.cat||"autre";
+      const cat=catOf(b);
       const dur=Math.max(0,timeToMin(b.end)-timeToMin(b.start));
       totals[cat]=(totals[cat]||0)+dur;
     });
     return totals;
   };
 
-  // Weekly category totals for the stats bar
   const weekTotals={};
   days.forEach(d=>{
     const t=catMinutesForDay(dateKey(d));
@@ -276,37 +276,37 @@ function WeekView({plans,onSelectDay}){
       const label=d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"short"});
       const isToday=key===TODAY();
       return<button key={key} onClick={()=>onSelectDay(key)} style={{
-        textAlign:"left",background:isToday?`${C.violet}18`:C.card,
-        border:`1.5px solid ${isToday?C.violet:C.border}`,borderRadius:14,
-        padding:"12px 14px",cursor:"pointer",color:C.text
+        textAlign:"left",background:isToday?C.rosePale:C.card,
+        border:`1.5px solid ${isToday?C.rose:C.border}`,borderRadius:18,
+        padding:"14px 16px",cursor:"pointer",color:C.text,
+        boxShadow:isToday?`0 4px 12px -3px ${C.rose}55`:"0 2px 8px -2px rgba(224,53,111,0.06)",
       }}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:13,fontWeight:700,textTransform:"capitalize"}}>{label}{isToday&&<span style={{color:C.violet,fontSize:11,marginLeft:6}}>· Aujourd'hui</span>}</div>
-          <div style={{fontSize:11,color:C.sub}}>{blocks.length>0?`${done}/${blocks.length}`:"—"}</div>
+          <div style={{fontSize:14,fontWeight:800,textTransform:"capitalize"}}>{label}{isToday&&<span style={{color:C.roseDeep,fontSize:11,marginLeft:6,fontWeight:700}}>· Aujourd'hui</span>}</div>
+          <div style={{fontSize:11,color:C.sub,fontWeight:700}}>{blocks.length>0?`${done}/${blocks.length}`:"—"}</div>
         </div>
-        {blocks.length>0&&<div style={{display:"flex",gap:4,marginTop:8,flexWrap:"wrap"}}>
-          {blocks.slice(0,6).map(b=><div key={b.id} style={{width:8,height:8,borderRadius:"50%",background:b.done?C.emerald:b.color}}/>)}
-          {blocks.length>6&&<span style={{fontSize:10,color:C.sub}}>+{blocks.length-6}</span>}
+        {blocks.length>0&&<div style={{display:"flex",gap:5,marginTop:10,flexWrap:"wrap"}}>
+          {blocks.slice(0,8).map(b=><div key={b.id} style={{width:9,height:9,borderRadius:"50%",background:b.done?C.green:CATS[catOf(b)].color}}/>)}
+          {blocks.length>8&&<span style={{fontSize:10,color:C.sub,fontWeight:700}}>+{blocks.length-8}</span>}
         </div>}
       </button>;
     })}
 
-    {/* Weekly category stats */}
     <Crd style={{marginTop:6}}>
       <Lbl>TEMPS PLANIFIÉ PAR CATÉGORIE (SEMAINE)</Lbl>
-      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
-        {Object.entries(CATS).map(([k,cat])=>{
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:14}}>
+        {Object.entries(CATS).filter(([k])=>k!=="autre").map(([k,cat])=>{
           const mins=weekTotals[k]||0;
           if(mins===0)return null;
           const pct=(mins/maxCatMin)*100;
           const h=Math.floor(mins/60),m=mins%60;
           return<div key={k}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:5,fontWeight:600}}>
               <span>{cat.icon} {cat.label}</span>
               <span style={{color:C.sub}}>{h>0?`${h}h`:""}{m>0?`${m}min`:""}</span>
             </div>
-            <div style={{background:C.dim,borderRadius:6,height:6,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${pct}%`,background:cat.color,borderRadius:6}}/>
+            <div style={{background:C.dim,borderRadius:8,height:8,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:cat.color,borderRadius:8}}/>
             </div>
           </div>;
         })}
@@ -321,7 +321,7 @@ function App(){
   const[data,setData]=useState(null);
   const[loaded,setLoaded]=useState(false);
   const[viewDate,setViewDate]=useState(TOMORROW());
-  const[viewMode,setViewMode]=useState("day"); // day | week
+  const[viewMode,setViewMode]=useState("day");
   const[toast,setToast]=useState(null);
   const[adding,setAdding]=useState(false);
 
@@ -338,9 +338,9 @@ function App(){
     setData(prev=>{const next=fn({...prev});persist(next);return next;});
   },[persist]);
 
-  const showT=(msg,color=C.emerald)=>{setToast({msg,color});setTimeout(()=>setToast(null),2200);};
+  const showT=(msg,color=C.rose)=>{setToast({msg,color});setTimeout(()=>setToast(null),2200);};
 
-  if(!loaded)return<div style={{background:C.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:C.violet,fontFamily:"monospace",fontSize:14}}>CHARGEMENT...</div></div>;
+  if(!loaded)return<div style={{background:C.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:C.rose,fontFamily:"monospace",fontSize:14,fontWeight:700}}>CHARGEMENT...</div></div>;
 
   const dayBlocks=(data.plans[viewDate]||[]).slice().sort((a,b)=>timeToMin(a.start)-timeToMin(b.start));
   const conflicts=detectConflicts(dayBlocks);
@@ -352,7 +352,7 @@ function App(){
       const list=[...(p.plans[viewDate]||[]),{...block,id:Date.now(),done:false}];
       return{...p,plans:{...p.plans,[viewDate]:list}};
     });
-    showT("Ajouté au planning !",C.emerald);
+    showT("Ajouté au planning !",C.green);
     setAdding(false);
   };
   const toggleDone=(id)=>update(p=>({...p,plans:{...p.plans,[viewDate]:(p.plans[viewDate]||[]).map(b=>b.id===id?{...b,done:!b.done}:b)}}));
@@ -374,36 +374,36 @@ function App(){
   const fh=Math.floor(totalFreeMin/60),fm=totalFreeMin%60;
 
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text}}>
-    {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#000",fontWeight:800,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 40px ${toast.color}66`,whiteSpace:"nowrap",animation:"pop .3s ease"}}>{toast.msg}</div>}
+    {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#fff",fontWeight:800,padding:"11px 26px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 24px -4px ${toast.color}88`,whiteSpace:"nowrap",animation:"pop .3s ease"}}>{toast.msg}</div>}
 
     {/* Header */}
-    <div style={{background:"linear-gradient(135deg,#0f0a1e 0%,#0a1020 100%)",borderBottom:`1px solid ${C.border}`,padding:"14px 16px"}}>
+    <div style={{background:`linear-gradient(160deg, ${C.rosePale} 0%, #ffffff 100%)`,borderBottom:`1px solid ${C.border}`,padding:"16px 16px 14px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontSize:10,color:C.sub,letterSpacing:2,textTransform:"uppercase"}}>📅 Planning</div>
-        <div style={{display:"flex",gap:6}}>
+        <div style={{fontSize:10,color:C.roseDeep,letterSpacing:2,textTransform:"uppercase",fontWeight:800}}>📅 Planning</div>
+        <div style={{display:"flex",gap:6,background:"#fff",padding:3,borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
           {["day","week"].map(v=>(
             <button key={v} onClick={()=>setViewMode(v)} style={{
-              background:viewMode===v?C.violet:C.surface,color:viewMode===v?"#fff":C.sub,
-              border:`1px solid ${viewMode===v?C.violet:C.border}`,borderRadius:16,
-              padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer"
+              background:viewMode===v?C.rose:"transparent",color:viewMode===v?"#fff":C.sub,
+              border:"none",borderRadius:11,
+              padding:"5px 14px",fontSize:11,fontWeight:800,cursor:"pointer"
             }}>{v==="day"?"Jour":"Semaine"}</button>
           ))}
         </div>
       </div>
 
       {viewMode==="day"&&<>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
-          <button onClick={()=>changeDay(-1)} style={{background:"none",border:"none",color:C.sub,fontSize:20,cursor:"pointer",padding:"4px 10px"}}>‹</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
+          <button onClick={()=>changeDay(-1)} style={{background:"#fff",border:`1px solid ${C.border}`,borderRadius:"50%",width:32,height:32,color:C.roseDeep,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
           <div style={{textAlign:"center"}}>
-            <div style={{fontSize:16,fontWeight:800,textTransform:"capitalize"}}>{dateLabel}</div>
-            <div style={{fontSize:11,color:isTomorrow?C.violet:C.sub,fontWeight:isTomorrow?700:400}}>{isToday?"Aujourd'hui":isTomorrow?"Demain":""}</div>
+            <div style={{fontSize:17,fontWeight:900,textTransform:"capitalize"}}>{dateLabel}</div>
+            <div style={{fontSize:11,color:isTomorrow?C.roseDeep:C.sub,fontWeight:800}}>{isToday?"Aujourd'hui":isTomorrow?"Demain":""}</div>
           </div>
-          <button onClick={()=>changeDay(1)} style={{background:"none",border:"none",color:C.sub,fontSize:20,cursor:"pointer",padding:"4px 10px"}}>›</button>
+          <button onClick={()=>changeDay(1)} style={{background:"#fff",border:`1px solid ${C.border}`,borderRadius:"50%",width:32,height:32,color:C.roseDeep,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
         </div>
-        <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:8}}>
-          {dayBlocks.length>0&&<div style={{fontSize:11,color:C.sub}}>✓ {completedCount}/{dayBlocks.length}</div>}
-          <div style={{fontSize:11,color:C.emerald}}>🕐 {fh}h{fm>0?fm:""} libre</div>
-          {conflicts.size>0&&<div style={{fontSize:11,color:C.rose,fontWeight:700}}>⚠️ {conflicts.size} conflit{conflicts.size>1?"s":""}</div>}
+        <div style={{display:"flex",justifyContent:"center",gap:14,marginTop:10}}>
+          {dayBlocks.length>0&&<div style={{fontSize:11,color:C.sub2,fontWeight:700,background:"#fff",padding:"4px 10px",borderRadius:20}}>✓ {completedCount}/{dayBlocks.length}</div>}
+          <div style={{fontSize:11,color:C.green,fontWeight:700,background:C.emeraldPale,padding:"4px 10px",borderRadius:20}}>🕐 {fh}h{fm>0?fm:""} libre</div>
+          {conflicts.size>0&&<div style={{fontSize:11,color:C.roseDeep,fontWeight:800,background:C.rosePale,padding:"4px 10px",borderRadius:20}}>⚠️ {conflicts.size} conflit{conflicts.size>1?"s":""}</div>}
         </div>
       </>}
     </div>
@@ -412,32 +412,32 @@ function App(){
       {viewMode==="week"
         ?<WeekView plans={data.plans} onSelectDay={(key)=>{setViewDate(key);setViewMode("day");}}/>
         :<>
-          {!isTomorrow&&<Btn onClick={()=>setViewDate(TOMORROW())} color={C.violet} full>📆 Aller au planning de demain</Btn>}
+          {!isTomorrow&&<Btn onClick={()=>setViewDate(TOMORROW())} color={C.rose} full>📆 Aller au planning de demain</Btn>}
 
           {dayBlocks.length===0
             ?<div style={{textAlign:"center",padding:"50px 20px",color:C.sub}}>
                 <div style={{fontSize:36,marginBottom:10}}>🗓️</div>
-                <div style={{fontSize:13}}>Aucun créneau planifié pour cette journée.</div>
+                <div style={{fontSize:13,fontWeight:600}}>Aucun créneau planifié pour cette journée.</div>
               </div>
             :<Timeline blocks={dayBlocks} conflicts={conflicts} onToggle={toggleDone} onRemove={removeBlock} onResize={resizeBlock}/>
           }
 
           {freeSlots.length>0&&dayBlocks.length>0&&<Crd style={{marginTop:16}}>
             <Lbl>🕐 CRÉNEAUX LIBRES</Lbl>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:12}}>
               {freeSlots.map((s,i)=>{
                 const dur=s.end-s.start;
                 if(dur<20)return null;
                 const h=Math.floor(dur/60),m=dur%60;
-                return<div key={i} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 12px",fontSize:12,color:C.sub}}>
-                  {minToTime(s.start)}–{minToTime(s.end)} <span style={{color:C.emerald}}>({h>0?`${h}h`:""}{m>0?`${m}min`:""})</span>
+                return<div key={i} style={{background:C.emeraldPale,borderRadius:12,padding:"7px 14px",fontSize:12,color:C.sub2,fontWeight:700}}>
+                  {minToTime(s.start)}–{minToTime(s.end)} <span style={{color:C.green}}>({h>0?`${h}h`:""}{m>0?`${m}min`:""})</span>
                 </div>;
               })}
             </div>
           </Crd>}
 
           {!adding
-            ?<button onClick={()=>setAdding(true)} style={{marginTop:16,width:"100%",background:C.surface,border:`1px dashed ${C.muted}`,borderRadius:14,padding:16,color:C.sub,fontSize:13,cursor:"pointer",fontWeight:700}}>+ Ajouter un créneau</button>
+            ?<button onClick={()=>setAdding(true)} style={{marginTop:16,width:"100%",background:C.rosePale,border:`1.5px dashed ${C.rose}`,borderRadius:18,padding:18,color:C.roseDeep,fontSize:14,cursor:"pointer",fontWeight:800}}>+ Ajouter un créneau</button>
             :<AddBlockForm onAdd={addBlock} onCancel={()=>setAdding(false)} freeSlots={freeSlots}/>
           }
         </>
@@ -450,21 +450,20 @@ function AddBlockForm({onAdd,onCancel,freeSlots}){
   const[type,setType]=useState("habit");
   const[label,setLabel]=useState("");
   const[icon,setIcon]=useState("📋");
-  const[color,setColor]=useState(C.violet);
+  const[cat,setCat]=useState("discipline");
   const[start,setStart]=useState("08:00");
   const[end,setEnd]=useState("09:00");
   const[customMode,setCustomMode]=useState(false);
 
   const presets=type==="habit"?HABIT_PRESETS:type==="epic"?EPIC_PRESETS:[];
 
-  const selectPreset=(p)=>{setLabel(p.label);setIcon(p.icon);setColor(p.color);setCustomMode(false);};
-
+  const selectPreset=(p)=>{setLabel(p.label);setIcon(p.icon);setCat(p.cat);setCustomMode(false);};
   const applySlot=(s)=>{setStart(minToTime(s.start));setEnd(minToTime(Math.min(s.start+60,s.end)));};
 
   const handleAdd=()=>{
     if(!label.trim())return;
     if(timeToMin(end)<=timeToMin(start))return;
-    onAdd({type,label:label.trim(),icon,color,start,end});
+    onAdd({type,label:label.trim(),icon,start,end});
   };
 
   return<Crd style={{marginTop:16,animation:"modalIn .3s ease"}}>
@@ -473,62 +472,63 @@ function AddBlockForm({onAdd,onCancel,freeSlots}){
     <div style={{display:"flex",gap:6,marginTop:12}}>
       {Object.entries(BLOCK_TYPES).map(([k,t])=>(
         <button key={k} onClick={()=>{setType(k);setLabel("");setCustomMode(false);}} style={{
-          flex:1,background:type===k?t.color:C.surface,color:type===k?"#fff":C.sub,
-          border:`1px solid ${type===k?t.color:C.border}`,borderRadius:10,
-          padding:"8px 4px",fontSize:11,fontWeight:700,cursor:"pointer"
+          flex:1,background:type===k?C.rose:C.surface,color:type===k?"#fff":C.sub2,
+          border:`1.5px solid ${type===k?C.rose:C.border}`,borderRadius:14,
+          padding:"9px 4px",fontSize:11,fontWeight:800,cursor:"pointer"
         }}>{t.icon} {t.label}</button>
       ))}
     </div>
 
-    {presets.length>0&&!customMode&&<div style={{marginTop:12}}>
-      <div style={{fontSize:11,color:C.sub,marginBottom:8}}>Choisis un préréglage ou personnalise :</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-        {presets.map(p=>(
-          <button key={p.label} onClick={()=>selectPreset(p)} style={{
-            background:label===p.label?p.color+"33":C.surface,
-            border:`1px solid ${label===p.label?p.color:C.border}`,
-            borderRadius:20,padding:"6px 12px",fontSize:12,color:C.text,cursor:"pointer"
-          }}>{p.icon} {p.label}</button>
-        ))}
+    {presets.length>0&&!customMode&&<div style={{marginTop:14}}>
+      <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>Choisis un préréglage ou personnalise :</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+        {presets.map(p=>{
+          const c=CATS[p.cat];
+          return<button key={p.label} onClick={()=>selectPreset(p)} style={{
+            background:label===p.label?c.color:c.bg,
+            border:"none",color:label===p.label?"#fff":C.text,
+            borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"
+          }}>{p.icon} {p.label}</button>;
+        })}
         <button onClick={()=>{setCustomMode(true);setLabel("");}} style={{
-          background:C.surface,border:`1px dashed ${C.muted}`,borderRadius:20,
-          padding:"6px 12px",fontSize:12,color:C.sub,cursor:"pointer"
+          background:"#fff",border:`1.5px dashed ${C.border}`,borderRadius:20,
+          padding:"7px 14px",fontSize:12,color:C.sub,cursor:"pointer",fontWeight:700
         }}>✏️ Personnalisé</button>
       </div>
     </div>}
 
-    {(type==="event"||customMode)&&<div style={{marginTop:12}}>
-      <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Nom du créneau</div>
+    {(type==="event"||customMode)&&<div style={{marginTop:14}}>
+      <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>Nom du créneau</div>
       <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Ex: RDV coiffeur, sortie avec Marc..." style={{...inSt,width:"100%"}}/>
     </div>}
 
-    <div style={{display:"flex",gap:10,marginTop:14}}>
+    <div style={{display:"flex",gap:10,marginTop:16}}>
       <div style={{flex:1}}>
-        <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Début</div>
+        <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>Début</div>
         <input type="time" value={start} onChange={e=>setStart(e.target.value)} style={{...inSt,width:"100%"}}/>
       </div>
       <div style={{flex:1}}>
-        <div style={{fontSize:11,color:C.sub,marginBottom:6}}>Fin</div>
+        <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>Fin</div>
         <input type="time" value={end} onChange={e=>setEnd(e.target.value)} style={{...inSt,width:"100%"}}/>
       </div>
     </div>
 
-    {freeSlots&&freeSlots.filter(s=>s.end-s.start>=20).length>0&&<div style={{marginTop:12}}>
-      <div style={{fontSize:11,color:C.sub,marginBottom:6}}>💡 Suggestions de créneaux libres</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+    {freeSlots&&freeSlots.filter(s=>s.end-s.start>=20).length>0&&<div style={{marginTop:14}}>
+      <div style={{fontSize:11,color:C.sub,marginBottom:8,fontWeight:700}}>💡 Suggestions de créneaux libres</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
         {freeSlots.filter(s=>s.end-s.start>=20).map((s,i)=>(
-          <button key={i} onClick={()=>applySlot(s)} style={{background:C.surface,border:`1px solid ${C.emerald}44`,borderRadius:10,padding:"5px 10px",fontSize:11,color:C.emerald,cursor:"pointer"}}>
+          <button key={i} onClick={()=>applySlot(s)} style={{background:C.emeraldPale,border:"none",borderRadius:14,padding:"6px 12px",fontSize:11,color:"#1a8a5c",cursor:"pointer",fontWeight:700}}>
             {minToTime(s.start)}–{minToTime(s.end)}
           </button>
         ))}
       </div>
     </div>}
 
-    {timeToMin(end)<=timeToMin(start)&&<div style={{fontSize:11,color:C.rose,marginTop:8}}>⚠️ L'heure de fin doit être après l'heure de début</div>}
+    {timeToMin(end)<=timeToMin(start)&&<div style={{fontSize:11,color:C.roseDeep,marginTop:10,fontWeight:700}}>⚠️ L'heure de fin doit être après l'heure de début</div>}
 
-    <div style={{display:"flex",gap:8,marginTop:14}}>
-      <Btn onClick={handleAdd} color={C.emerald} full>Ajouter au planning</Btn>
-      <Btn onClick={onCancel} color={C.muted}>Annuler</Btn>
+    <div style={{display:"flex",gap:8,marginTop:16}}>
+      <Btn onClick={handleAdd} color={C.green} full>Ajouter au planning</Btn>
+      <Btn onClick={onCancel} color={C.sub} small textColor="#fff">Annuler</Btn>
     </div>
   </Crd>;
 }
