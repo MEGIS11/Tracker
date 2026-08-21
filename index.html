@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
@@ -67,13 +67,17 @@ const C={
 };
 
 const SK="amaury-quest-v4";
-const TODAY=()=>new Date().toISOString().slice(0,10);
+const fmtLocalDate=(d)=>{
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
+const TODAY=()=>fmtLocalDate(new Date());
 const getWeekKey=()=>{
   const d=new Date();
   const day=d.getDay()===0?7:d.getDay(); // Monday=1..Sunday=7
   const monday=new Date(d);
   monday.setDate(d.getDate()-(day-1));
-  return monday.toISOString().slice(0,10);
+  return fmtLocalDate(monday);
 };
 
 const RANKS=[
@@ -483,6 +487,68 @@ function analyzeActivity(text){
     // Late-night detection
     const lateNight=/\b(tard|nuit|minuit|3h|2h|1h du mat|insomnie)\b/.test(t);
 
+    // === Bell-curve helper: score peaks at optimal range, tapers below and above ===
+    // segments: array of {upTo (minutes), fn(minutes)->score 0..1} evaluated in order
+    const bellCurve=(minutes,{lowEnd,optStart,optEnd,highEnd,plateauAfter})=>{
+      if(minutes<=0)return 0;
+      if(minutes<lowEnd) return (minutes/lowEnd)*0.25; // very little benefit below low threshold
+      if(minutes<optStart) return 0.25+((minutes-lowEnd)/(optStart-lowEnd))*0.75; // ramping up to optimal
+      if(minutes<=optEnd) return 1; // optimal plateau = full score
+      if(minutes<highEnd) return 1-((minutes-optEnd)/(highEnd-optEnd))*0.3; // gentle taper past optimal
+      if(plateauAfter) return 0.7; // plateaus, never penalized further
+      return Math.max(0.4,0.7-((minutes-highEnd)/60)*0.15); // slow decline if excess is meaningfully penalized
+    };
+
+    // === SPECIAL CASE: Sleep (bell curve, Corps + light Cerveau, NOT Discipline) ===
+    const sleepWords=["dormi","dors","sommeil","nuit de sommeil","sieste"];
+    if(sleepWords.some(w=>t.includes(w))&&!t.includes("sieste")){
+      // optimal 8-9h for an 18yo athletic male
+      const score=bellCurve(mins,{lowEnd:180,optStart:480,optEnd:540,highEnd:600,plateauAfter:true}); // 3h low, 8-9h optimal, plateaus after 10h
+      resolve({...Z,corps:Math.round(score*18),cerveau:Math.round(score*9)});
+      return;
+    }
+    if(t.includes("sieste")){
+      // short naps are good, long naps (>1h30) can disrupt night sleep — mild bell curve
+      const score=bellCurve(mins,{lowEnd:10,optStart:20,optEnd:30,highEnd:90,plateauAfter:false});
+      resolve({...Z,corps:Math.round(score*8),cerveau:Math.round(score*5)});
+      return;
+    }
+
+    // === SPECIAL CASE: Gym/Muscu (bell curve, plateau after — never penalized for a long session) ===
+    const gymWords=["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche","crossfit"];
+    if(gymWords.some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:15,optStart:45,optEnd:90,highEnd:120,plateauAfter:true});
+      const eff=score*sportIntensityMul;
+      resolve({...Z,corps:Math.round(Math.min(20,eff*17)),cerveau:1,apparence:Math.round(eff*3),discipline:Math.round(eff*6)});
+      return;
+    }
+
+    // === SPECIAL CASE: Cardio/Course (bell curve, plateaus after 60min) ===
+    const cardioWords=["course","courir","jogging","sprint","cardio","run","hiit","velo","cyclisme","natation","nager","spinning"];
+    if(cardioWords.some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:10,optStart:20,optEnd:45,highEnd:60,plateauAfter:true});
+      const eff=score*sportIntensityMul;
+      resolve({...Z,corps:Math.round(Math.min(20,eff*16)),cerveau:Math.round(eff*3),apparence:Math.round(eff*2),discipline:Math.round(eff*5)});
+      return;
+    }
+
+    // === SPECIAL CASE: Marche (slow taper after 90min, never harshly penalized) ===
+    const walkWords=["marche","marcher","balade","balader","promenade","promener","randonnee","randonner","hiking"];
+    if(walkWords.some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:5,optStart:20,optEnd:60,highEnd:120,plateauAfter:true});
+      const isHike=["randonnee","randonner","hiking"].some(w=>t.includes(w));
+      resolve({...Z,corps:Math.round(score*(isHike?9:7)),cerveau:Math.round(score*(isHike?6:3)),discipline:Math.round(score*3)});
+      return;
+    }
+
+    // === SPECIAL CASE: Étirements/Mobilité (short optimal window) ===
+    const stretchWords=["etirement","etirer","stretching","souplesse","mobilite","pilates","yoga"];
+    if(stretchWords.some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:5,optStart:10,optEnd:20,highEnd:40,plateauAfter:true});
+      resolve({...Z,corps:Math.round(score*7),cerveau:Math.round(score*3),apparence:1,discipline:Math.round(score*4)});
+      return;
+    }
+
     // === SPECIAL CASE: Video games (nuanced by game type + duration + time of day) ===
     const competitiveGames=["fortnite","cod","call of duty","warzone","apex","valorant","lol","league of legends","overwatch","pubg"];
     const casualMobileGames=["brawl stars","clash royale","clash of clans","candy crush","subway surfer","mobile legends"];
@@ -605,15 +671,29 @@ function analyzeActivity(text){
     if(macroTotals&&macroTotals.matched){
       // Daily targets for Amaury: 18yo, 1m87, 72kg, lean bulk
       const T={kcal:2800,p:155,c:325,f:80,fi:30,suMax:50};
-      // Score each macro as a fraction of its daily target contribution (this single meal's worth)
-      const pScore=Math.min(1,macroTotals.p/T.p)*22; // protein matters most
-      const kcalRatio=macroTotals.kcal/T.kcal;
-      const kcalScore=(kcalRatio>0&&kcalRatio<0.6)?kcalRatio*15:15-Math.abs(kcalRatio-0.35)*10; // reasonable single-meal share
-      const fiScore=Math.min(1,macroTotals.fi/T.fi)*8;
-      const sugarPenalty=macroTotals.su>25?-Math.min(15,(macroTotals.su-25)*0.5):0;
-      const fatRatio=macroTotals.f/T.f;
-      const fatScore=fatRatio<0.5?4:fatRatio<0.8?2:-3;
-      const nutritionImpact=Math.round(Math.max(-15,Math.min(20,pScore*0.6+Math.max(0,kcalScore)*0.5+fiScore*0.6+fatScore+sugarPenalty)));
+
+      // Calorie share of a meal: optimal = 1/4 to 1/3 of daily needs (~700-933 kcal), tapers past 1300 (oversized meal)
+      const kcalScore=bellCurve(macroTotals.kcal,{lowEnd:150,optStart:700,optEnd:933,highEnd:1300,plateauAfter:false});
+
+      // Protein: scored against ~35% of daily target in one meal = full mark
+      const pScore=Math.min(1,macroTotals.p/(T.p*0.35));
+
+      // Fiber: more is basically always fine, scored the same way
+      const fiScore=Math.min(1,macroTotals.fi/(T.fi*0.35));
+
+      // Fat: tighter optimal window (12-25g), tapers past 40g rather than plateauing — a very high-fat meal is genuinely less ideal
+      const fatScore=bellCurve(macroTotals.f,{lowEnd:5,optStart:12,optEnd:25,highEnd:40,plateauAfter:false});
+
+      // Sugar: pure penalty past a reasonable single-meal threshold
+      const sugarPenalty=macroTotals.su>20?-Math.min(15,(macroTotals.su-20)*0.5):0;
+
+      // Junk/processed food flag: grams alone can't capture "this is fast food" — layer a qualitative penalty on top
+      const junkWords=["pizza","burger","fast food","mcdo","kebab","frite","frites","nuggets","chips","hot dog"];
+      const junkPenalty=junkWords.some(w=>t.includes(w))?14:0;
+
+      const nutritionImpact=Math.round(Math.max(-15,Math.min(20,
+        kcalScore*8 + pScore*9 + fiScore*4 + fatScore*3 + sugarPenalty - junkPenalty
+      )));
       resolve({
         ...Z,
         nutrition:nutritionImpact,
@@ -625,15 +705,9 @@ function analyzeActivity(text){
 
     // Activity database: {keywords[], impacts per 30min}
     const DB=[
-      // === SPORT & CORPS ===
-      {k:["gym","muscu","musculation","soulevé","haltere","kettlebell","barbell","bench","squat","deadlift","tractions","pompes","dips","abdos","gainage","planche"],i:{...Z,corps:12,cerveau:1,apparence:3,discipline:8},sport:true},
-      {k:["course","courir","jogging","sprint","cardio","run","hiit"],i:{...Z,corps:11,cerveau:2,apparence:2,discipline:7},sport:true},
+      // === SPORT & CORPS (fallback — gym/cardio/marche/étirements/sommeil handled above with bell curves) ===
       {k:["foot","football","futsal","match"],i:{...Z,corps:10,cerveau:3,apparence:1,discipline:6,social:5},sport:true},
-      {k:["basket","basketball","tennis","badminton","ping","pong","natation","nager","velo","cyclisme","boxe","mma","judo","karate","crossfit","spinning"],i:{...Z,corps:9,cerveau:2,apparence:1,discipline:6},sport:true},
-      {k:["marche","marcher","balade","balader","promenade","promener"],i:{...Z,corps:5,cerveau:3,discipline:3},sport:true},
-      {k:["randonnee","randonner","foret","montagne","nature","hiking"],i:{...Z,corps:7,cerveau:5,discipline:4},sport:true},
-      {k:["etirement","etirer","stretching","yoga","souplesse","mobilite","pilates"],i:{...Z,corps:5,cerveau:2,apparence:1,discipline:5},sport:true},
-      {k:["sieste","dormi","dors","sommeil"],i:{...Z,corps:4,cerveau:3,apparence:2,discipline:-1}},
+      {k:["basket","basketball","tennis","badminton","ping","pong","boxe","mma","judo","karate"],i:{...Z,corps:9,cerveau:2,apparence:1,discipline:6},sport:true},
       {k:["danse","danser"],i:{...Z,corps:8,cerveau:2,apparence:3,discipline:4,social:4},sport:true},
 
       // === NUTRITION (fallback for text without grams) ===
@@ -1054,7 +1128,7 @@ function HistoryChart({s,gs,cs}){
   for(let i=range-1;i>=0;i--){
     const d=new Date();
     d.setDate(d.getDate()-i);
-    const key=d.toISOString().slice(0,10);
+    const key=fmtLocalDate(d);
     const isToday=key===TODAY();
     const found=hist.find(h=>h.date===key);
     days.push({date:key,score:getScoreFor(found,isToday),isToday});
