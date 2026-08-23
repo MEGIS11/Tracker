@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
@@ -464,22 +464,34 @@ function analyzeActivity(text){
     const t=text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
     const Z={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
 
-    // Extract duration in minutes
+    // Extract duration in minutes — prioritize durations near duration-context words ("pendant", "durant")
+    // and duration-shaped numbers, while avoiding false positives from clock times ("à 14h", "vers 23h")
     let mins=0;
-    const hMatch=t.match(/(\d+[\.,]?\d*)\s*h/);
-    const mMatch=t.match(/(\d+[\.,]?\d*)\s*min/);
-    const secMatch=t.match(/(\d+[\.,]?\d*)\s*sec/);
-    if(hMatch) mins+=parseFloat(hMatch[1].replace(",","."))*60;
-    if(mMatch) mins+=parseFloat(mMatch[1].replace(",","."));
-    if(secMatch) mins+=parseFloat(secMatch[1].replace(",","."))/60;
-    if(mins===0) mins=30; // default if no duration
+    // Clock-time patterns to EXCLUDE from duration matching: "à 14h", "vers 23h", "de 8h à 9h" (schedule mentions)
+    const clockTimePattern=/\b(a|à|vers|des|depuis)\s+\d+[\.,]?\d*\s*h\b/g;
+    const excludedRanges=[];
+    let cm;
+    while((cm=clockTimePattern.exec(t))!==null){
+      excludedRanges.push([cm.index,cm.index+cm[0].length]);
+    }
+    const isExcluded=(idx)=>excludedRanges.some(([s,e])=>idx>=s&&idx<e);
+
+    const hMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*h(?:eures?)?\b/g)].filter(m=>!isExcluded(m.index));
+    const mMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*min(?:utes?)?\b/g)].filter(m=>!isExcluded(m.index));
+    const secMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*sec(?:ondes?)?\b/g)].filter(m=>!isExcluded(m.index));
+    if(hMatches.length) mins+=parseFloat(hMatches[0][1].replace(",","."))*60;
+    if(mMatches.length) mins+=parseFloat(mMatches[0][1].replace(",","."));
+    if(secMatches.length) mins+=parseFloat(secMatches[0][1].replace(",","."))/60;
+    if(mins===0) mins=30; // default if no duration found
+    // Safety cap: no single logged activity is realistically longer than 6h — prevents any residual mis-extraction from exploding the multiplier
+    mins=Math.min(mins,360);
 
     // Duration multiplier: base is 30min
     const mul=Math.min(mins/30, 6); // cap at 6x (3h)
 
     // Intensity detection for sport activities (léger/modéré/intense)
-    const intenseWords=["intense","hiit","a fond","tres dur","killer","explosif","max effort","a bloc"];
-    const lightWords=["leger","légere","tranquille","doux","recup","récup","cool","facile","balade"];
+    const intenseWords=["intense","hiit","a fond","tres dur","très dur","killer","explosif","max effort","a bloc","à bloc"];
+    const lightWords=["seance legere","séance légère","entrainement leger","tranquille","recup","récup","balade tranquille","seance facile","séance facile"];
     const isIntense=intenseWords.some(w=>t.includes(w));
     const isLight=lightWords.some(w=>t.includes(w));
     const sportIntensityMul=isIntense?1.35:isLight?0.7:1;
@@ -499,18 +511,19 @@ function analyzeActivity(text){
       return Math.max(0.4,0.7-((minutes-highEnd)/60)*0.15); // slow decline if excess is meaningfully penalized
     };
 
-    // === SPECIAL CASE: Sleep (bell curve, Corps + light Cerveau, NOT Discipline) ===
-    const sleepWords=["dormi","dors","sommeil","nuit de sommeil","sieste"];
-    if(sleepWords.some(w=>t.includes(w))&&!t.includes("sieste")){
-      // optimal 8-9h for an 18yo athletic male
-      const score=bellCurve(mins,{lowEnd:180,optStart:480,optEnd:540,highEnd:600,plateauAfter:true}); // 3h low, 8-9h optimal, plateaus after 10h
-      resolve({...Z,corps:Math.round(score*18),cerveau:Math.round(score*9)});
-      return;
-    }
+    // === SPECIAL CASE: Sieste checked FIRST (priority) to avoid fragile exclusion logic ===
     if(t.includes("sieste")){
       // short naps are good, long naps (>1h30) can disrupt night sleep — mild bell curve
       const score=bellCurve(mins,{lowEnd:10,optStart:20,optEnd:30,highEnd:90,plateauAfter:false});
       resolve({...Z,corps:Math.round(score*8),cerveau:Math.round(score*5)});
+      return;
+    }
+    // === SPECIAL CASE: Night sleep (bell curve, Corps + light Cerveau, NOT Discipline) ===
+    const sleepWords=["dormi","dors","sommeil","nuit de sommeil"];
+    if(sleepWords.some(w=>t.includes(w))){
+      // optimal 8-9h for an 18yo athletic male
+      const score=bellCurve(mins,{lowEnd:180,optStart:480,optEnd:540,highEnd:600,plateauAfter:true}); // 3h low, 8-9h optimal, plateaus after 10h
+      resolve({...Z,corps:Math.round(score*18),cerveau:Math.round(score*9)});
       return;
     }
 
@@ -637,23 +650,44 @@ function analyzeActivity(text){
       {k:["bonbon","bonbons"],kcal:390,p:0,c:98,f:0.2,fi:0,su:75},
       {k:["shake proteine","whey","proteine en poudre"],kcal:400,p:80,c:8,f:5,fi:1,su:4},
       {k:["pate a tartiner","nutella"],kcal:539,p:6.3,c:57,f:31,fi:3.4,su:56},
+      {k:["fanta","coca","coca cola","soda","limonade","sprite"],kcal:42,p:0,c:10.6,f:0,fi:0,su:10.6},
+      {k:["jus de fruit","jus d'orange","jus de pomme"],kcal:45,p:0.5,c:10,f:0.1,fi:0.2,su:9},
     ];
 
-    // === Detect food entries with grams and compute macro totals ===
-    const gramMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*g(?:r|rammes?)?\b/g)];
+    // === Detect food entries with grams/ml/portions and compute macro totals ===
+    // grams and ml (ml treated ~1g/ml, close enough for drinks/liquids)
+    const gramMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*(?:g(?:r|rammes?)?|ml|millilitres?)\b/g)];
+    // whole-unit words: "1 pizza", "2 parts", "1 tranche" — mapped to a reasonable default gram estimate per unit
+    const unitDefaults={
+      "part":250,"parts":250,"tranche":80,"tranches":80,
+      "pizza":700,"pizzas":700, // whole pizza ≈ 700g
+      "burger":250,"burgers":250,
+      "verre":200,"verres":200,"canette":330,"cannette":330,
+    };
+    const unitMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*(part|parts|tranche|tranches|pizza|pizzas|burger|burgers|verre|verres|canette|cannette)\b/g)];
+
     let macroTotals=null;
-    if(gramMatches.length>0){
+    if(gramMatches.length>0||unitMatches.length>0){
       macroTotals={kcal:0,p:0,c:0,f:0,fi:0,su:0,matched:false};
       for(const food of FOOD_DB){
         for(const kw of food.k){
           const idx=t.indexOf(kw);
           if(idx===-1)continue;
-          // find the nearest gram quantity to this keyword occurrence (before or shortly after)
           let bestGram=null,bestDist=Infinity;
           for(const gm of gramMatches){
             const dist=Math.abs(gm.index-idx);
             if(dist<bestDist&&dist<25){bestDist=dist;bestGram=parseFloat(gm[1].replace(",","."));}
           }
+          for(const um of unitMatches){
+            const dist=Math.abs(um.index-idx);
+            if(dist<bestDist&&dist<25){
+              const qty=parseFloat(um[1].replace(",","."));
+              const perUnit=unitDefaults[um[2]]||150;
+              bestDist=dist;bestGram=qty*perUnit;
+            }
+          }
+          // Fallback: mentioning a whole food item with no quantity at all nearby gets a default single-serving estimate
+          if(!bestGram&&unitDefaults[kw]){bestGram=unitDefaults[kw];}
           if(bestGram){
             const ratio=bestGram/100;
             macroTotals.kcal+=food.kcal*ratio;
@@ -711,14 +745,14 @@ function analyzeActivity(text){
       {k:["danse","danser"],i:{...Z,corps:8,cerveau:2,apparence:3,discipline:4,social:4},sport:true},
 
       // === NUTRITION (fallback for text without grams) ===
-      {k:["cuisine","cuisiné","prépare","repas","fait a manger","cook"],i:{...Z,corps:2,nutrition:8,cerveau:3,apparence:1,discipline:6}},
-      {k:["legume","legumes","salade","brocoli","carotte","epinard","courgette","tomate","concombre","poivron"],i:{...Z,corps:2,nutrition:10,apparence:3,discipline:3}},
-      {k:["fruit","pomme","banane","orange","fraise","myrtille","mangue","kiwi","raisin"],i:{...Z,corps:2,nutrition:9,apparence:3,discipline:2}},
-      {k:["proteine","poulet","dinde","boeuf","poisson","saumon","thon","oeuf","fromage blanc","yaourt","shake"],i:{...Z,corps:3,nutrition:9,apparence:2,discipline:3}},
-      {k:["pizza","burger","fast food","mcdo","kebab","frite","chips","nuggets"],i:{...Z,corps:-4,nutrition:-8,apparence:-3,discipline:-5}},
-      {k:["sucre","bonbon","gateau","chocolat","glace","dessert","viennoiserie"],i:{...Z,corps:-2,nutrition:-6,apparence:-2,discipline:-4}},
-      {k:["alcool","biere","vin","cocktail","boire"],i:{...Z,corps:-5,nutrition:-7,cerveau:-4,apparence:-3,discipline:-6}},
-      {k:["eau","hydrat"],i:{...Z,corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2}},
+      {k:["cuisine","cuisiné","prépare","repas","fait a manger","cook"],i:{...Z,corps:2,nutrition:8,cerveau:3,apparence:1,discipline:6},nutriFallback:true},
+      {k:["legume","legumes","salade","brocoli","carotte","epinard","courgette","tomate","concombre","poivron"],i:{...Z,corps:2,nutrition:10,apparence:3,discipline:3},nutriFallback:true},
+      {k:["fruit","pomme","banane","orange","fraise","myrtille","mangue","kiwi","raisin"],i:{...Z,corps:2,nutrition:9,apparence:3,discipline:2},nutriFallback:true},
+      {k:["proteine","poulet","dinde","boeuf","poisson","saumon","thon","oeuf","fromage blanc","yaourt","shake"],i:{...Z,corps:3,nutrition:9,apparence:2,discipline:3},nutriFallback:true},
+      {k:["pizza","burger","fast food","mcdo","kebab","frite","chips","nuggets"],i:{...Z,corps:-4,nutrition:-8,apparence:-3,discipline:-5},nutriFallback:true},
+      {k:["sucre","bonbon","gateau","chocolat","glace","dessert","viennoiserie"],i:{...Z,corps:-2,nutrition:-6,apparence:-2,discipline:-4},nutriFallback:true},
+      {k:["alcool","biere","bière","du vin","verre de vin","cocktail","soiree arrosee","soirée arrosée"],i:{...Z,corps:-5,nutrition:-7,cerveau:-4,apparence:-3,discipline:-6},nutriFallback:true},
+      {k:["de l'eau","d'eau","hydrat","bu de l'eau"],i:{...Z,corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2},nutriFallback:true},
 
       // === CERVEAU ===
       {k:["livre","lire","lu","lecture","roman","bouquin","bd","manga","essai"],i:{...Z,cerveau:10,discipline:6}},
@@ -766,7 +800,24 @@ function analyzeActivity(text){
       {k:["dormi trop","oversleep","grasse matinee","grasse matinée"],i:{...Z,corps:-1,cerveau:-2,apparence:-1,discipline:-6}},
     ];
 
-    // Find matching activity
+    // Find matching activity — for nutrition fallback entries specifically, SUM all matches
+    // (so "repas" + "pizza" both apply, rather than one arbitrarily winning a tie)
+    let nutritionSum=null;
+    for(const entry of DB){
+      if(!entry.nutriFallback)continue;
+      if(entry.k.some(kw=>t.includes(kw))){
+        if(!nutritionSum)nutritionSum={...Z};
+        Object.keys(entry.i).forEach(k=>{nutritionSum[k]=(nutritionSum[k]||0)+entry.i[k];});
+      }
+    }
+    if(nutritionSum){
+      // Clamp each category to the same -20..20 range as everything else
+      const clamped={};
+      Object.keys(Z).forEach(k=>{clamped[k]=Math.round(Math.max(-20,Math.min(20,nutritionSum[k]||0)));});
+      resolve(clamped);
+      return;
+    }
+
     let bestMatch=null, bestScore=0;
     for(const entry of DB){
       let score=0;
