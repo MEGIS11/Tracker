@@ -46,9 +46,13 @@ const C={
 };
 
 const SK="amaury-planning-v3";
-const TODAY=()=>new Date().toISOString().slice(0,10);
-const TOMORROW=()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);};
-const dateKey=(d)=>d.toISOString().slice(0,10);
+const fmtLocalDate=(d)=>{
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
+const TODAY=()=>fmtLocalDate(new Date());
+const TOMORROW=()=>{const d=new Date();d.setDate(d.getDate()+1);return fmtLocalDate(d);};
+const dateKey=(d)=>fmtLocalDate(d);
 
 // Category colors mirror the Tracker exactly
 const CATS={
@@ -243,7 +247,7 @@ function Timeline({blocks,conflicts,onToggle,onRemove,onResize,startHour=6,endHo
 }
 
 // ═══════════════════ WEEK VIEW ═══════════════════
-function WeekView({plans,onSelectDay}){
+function WeekList({plans,onSelectDay}){
   const days=[];
   const today=new Date();
   for(let i=0;i<7;i++){
@@ -316,6 +320,97 @@ function WeekView({plans,onSelectDay}){
   </div>;
 }
 
+// ═══════════════════ WEEK GRID (Google Calendar-style, landscape) ═══════════════════
+function WeekGrid({plans,onSelectDay,onToggle,startHour=6,endHour=23}){
+  const days=[];
+  const today=new Date();
+  for(let i=0;i<7;i++){
+    const d=new Date(today);d.setDate(today.getDate()+i);
+    days.push(d);
+  }
+  const HOUR_H=46;
+  const totalMin=(endHour-startHour)*60;
+  const totalH=(endHour-startHour)*HOUR_H;
+  const hours=[];
+  for(let h=startHour;h<=endHour;h++)hours.push(h);
+
+  const nowMin=(()=>{const n=new Date();return n.getHours()*60+n.getMinutes();})();
+  const showNowLine=nowMin>=startHour*60&&nowMin<=endHour*60;
+  const nowY=((nowMin-startHour*60)/totalMin)*totalH;
+
+  return<div style={{animation:"slideTab .3s ease"}}>
+    {/* Day headers */}
+    <div style={{display:"flex",borderBottom:`2px solid ${C.border}`,paddingBottom:8,marginBottom:4}}>
+      <div style={{width:38,flexShrink:0}}/>
+      {days.map(d=>{
+        const key=dateKey(d);
+        const isToday=key===TODAY();
+        return<button key={key} onClick={()=>onSelectDay(key)} style={{
+          flex:1,background:"none",border:"none",cursor:"pointer",textAlign:"center",padding:"4px 2px"
+        }}>
+          <div style={{fontSize:10,color:isToday?C.roseDeep:C.sub,fontWeight:800,textTransform:"uppercase"}}>{d.toLocaleDateString("fr-FR",{weekday:"short"})}</div>
+          <div style={{
+            fontSize:15,fontWeight:900,marginTop:2,color:isToday?"#fff":C.text,
+            display:"inline-flex",alignItems:"center",justifyContent:"center",
+            width:28,height:28,borderRadius:"50%",background:isToday?C.rose:"transparent"
+          }}>{d.getDate()}</div>
+        </button>;
+      })}
+    </div>
+
+    {/* Grid body */}
+    <div style={{display:"flex",position:"relative"}}>
+      {/* Hour labels column */}
+      <div style={{width:38,flexShrink:0,position:"relative",height:totalH}}>
+        {hours.map((h,i)=>(
+          <div key={h} style={{position:"absolute",top:i*HOUR_H,right:6,fontSize:9,color:C.sub,fontWeight:700,transform:"translateY(-6px)"}}>{h}h</div>
+        ))}
+      </div>
+
+      {/* Day columns */}
+      <div style={{flex:1,display:"flex",position:"relative"}}>
+        {/* Shared hour grid lines spanning all columns */}
+        <div style={{position:"absolute",top:0,left:0,right:0,height:totalH,pointerEvents:"none"}}>
+          {hours.map((h,i)=>(
+            <div key={h} style={{position:"absolute",top:i*HOUR_H,left:0,right:0,borderTop:`1px solid ${C.border}`}}/>
+          ))}
+          {showNowLine&&<div style={{position:"absolute",top:nowY,left:0,right:0,height:2,background:C.roseDeep,zIndex:1}}/>}
+        </div>
+
+        {days.map((d,di)=>{
+          const key=dateKey(d);
+          const blocks=(plans[key]||[]);
+          const isToday=key===TODAY();
+          return<div key={key} style={{
+            flex:1,position:"relative",height:totalH,
+            borderLeft:di>0?`1px solid ${C.border}`:"none",
+            background:isToday?"rgba(255,92,138,0.04)":"transparent"
+          }}>
+            {blocks.map(b=>{
+              const sMin=timeToMin(b.start),eMin=Math.max(timeToMin(b.end),sMin+15);
+              const top=((sMin-startHour*60)/totalMin)*totalH;
+              const height=Math.max(((eMin-sMin)/totalMin)*totalH,16);
+              const cat=CATS[catOf(b)];
+              return<div key={b.id} onClick={()=>onToggle(key,b.id)} title={`${b.label} · ${b.start}-${b.end}`} style={{
+                position:"absolute",top,left:2,right:2,height,
+                background:b.done?C.emeraldPale:cat.bg,
+                borderLeft:`3px solid ${b.done?C.green:cat.color}`,
+                borderRadius:6,padding:"2px 5px",overflow:"hidden",cursor:"pointer",
+                animation:"blockIn .25s ease both",
+              }}>
+                <div style={{fontSize:9,fontWeight:800,color:b.done?C.green:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.3,textDecoration:b.done?"line-through":"none"}}>
+                  {b.icon} {b.label}
+                </div>
+                {height>28&&<div style={{fontSize:8,color:C.sub2,fontWeight:600}}>{b.start}</div>}
+              </div>;
+            })}
+          </div>;
+        })}
+      </div>
+    </div>
+  </div>;
+}
+
 // ═══════════════════ MAIN APP ═══════════════════
 function App(){
   const[data,setData]=useState(null);
@@ -324,6 +419,17 @@ function App(){
   const[viewMode,setViewMode]=useState("day");
   const[toast,setToast]=useState(null);
   const[adding,setAdding]=useState(false);
+  const[isLandscape,setIsLandscape]=useState(typeof window!=="undefined"?window.innerWidth>window.innerHeight:false);
+
+  useEffect(()=>{
+    const onResize=()=>setIsLandscape(window.innerWidth>window.innerHeight);
+    window.addEventListener("resize",onResize);
+    window.addEventListener("orientationchange",onResize);
+    return()=>{
+      window.removeEventListener("resize",onResize);
+      window.removeEventListener("orientationchange",onResize);
+    };
+  },[]);
 
   useEffect(()=>{
     try{
@@ -367,7 +473,7 @@ function App(){
   const changeDay=(delta)=>{
     const d=new Date(viewDate+"T00:00:00");
     d.setDate(d.getDate()+delta);
-    setViewDate(d.toISOString().slice(0,10));
+    setViewDate(fmtLocalDate(d));
   };
 
   const completedCount=dayBlocks.filter(b=>b.done).length;
@@ -408,9 +514,12 @@ function App(){
       </>}
     </div>
 
-    <div style={{padding:"16px 14px 100px"}}>
+    <div style={{padding:isLandscape&&viewMode==="week"?"16px 18px 40px":"16px 14px 100px"}}>
       {viewMode==="week"
-        ?<WeekView plans={data.plans} onSelectDay={(key)=>{setViewDate(key);setViewMode("day");}}/>
+        ?(isLandscape
+            ?<WeekGrid plans={data.plans} onSelectDay={(key)=>{setViewDate(key);setViewMode("day");}} onToggle={(dayKey,id)=>update(p=>({...p,plans:{...p.plans,[dayKey]:(p.plans[dayKey]||[]).map(b=>b.id===id?{...b,done:!b.done}:b)}}))}/>
+            :<WeekList plans={data.plans} onSelectDay={(key)=>{setViewDate(key);setViewMode("day");}}/>
+          )
         :<>
           {!isTomorrow&&<Btn onClick={()=>setViewDate(TOMORROW())} color={C.rose} full>📆 Aller au planning de demain</Btn>}
 
