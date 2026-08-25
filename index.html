@@ -562,6 +562,37 @@ function analyzeActivity(text){
       return;
     }
 
+    // === SPECIAL CASE: Travail/Révisions (30min baseline, optimal 3-4h, plateaus after — mix Cerveau + Discipline) ===
+    const workWords=["travail","travailler","bosser","bosse","boulot","stage","job","revision","révision","reviser","réviser","etude","étude","etudier","étudier","cours"];
+    if(workWords.some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:20,optStart:180,optEnd:240,highEnd:300,plateauAfter:true}); // 30min = solid baseline, ramps to optimal 3-4h, plateaus after 5h
+      resolve({...Z,cerveau:Math.round(score*13),discipline:Math.round(score*13)});
+      return;
+    }
+
+    // === SPECIAL CASE: Méditation (tight optimal window, real diminishing returns past 20min) ===
+    if(["meditation","mediter","pleine conscience","mindfulness"].some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:3,optStart:10,optEnd:20,highEnd:40,plateauAfter:true});
+      resolve({...Z,corps:Math.round(score*2),cerveau:Math.round(score*7),discipline:Math.round(score*8)});
+      return;
+    }
+
+    // === SPECIAL CASE: Lecture/Japonais/Codage/Écriture (gentle slowdown after 60-90min, never penalized) ===
+    const deepFocusWords=["livre","lire","lu ","lecture","roman","bouquin","bd","manga","essai","japonais","kanji","hiragana","katakana","duolingo","coder","programmer","code","dev","javascript","python","ecrire","rediger","dissertation","poeme","poésie"];
+    if(deepFocusWords.some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:5,optStart:30,optEnd:90,highEnd:150,plateauAfter:true});
+      resolve({...Z,cerveau:Math.round(score*11),discipline:Math.round(score*6)});
+      return;
+    }
+
+    // === SPECIAL CASE: Échecs/Jeux de réflexion (plateau after 45-60min mental fatigue) ===
+    if(["echecs","chess","sudoku","puzzle","enigme","mots croises","scrabble"].some(w=>t.includes(w))){
+      const score=bellCurve(mins,{lowEnd:5,optStart:20,optEnd:45,highEnd:60,plateauAfter:true});
+      const isOnline=["echecs en ligne","chess.com","lichess"].some(w=>t.includes(w));
+      resolve({...Z,cerveau:Math.round(score*10),discipline:Math.round(score*6),social:isOnline?Math.round(score*3):0});
+      return;
+    }
+
     // === SPECIAL CASE: Video games (nuanced by game type + duration + time of day) ===
     const competitiveGames=["fortnite","cod","call of duty","warzone","apex","valorant","lol","league of legends","overwatch","pubg"];
     const casualMobileGames=["brawl stars","clash royale","clash of clans","candy crush","subway surfer","mobile legends"];
@@ -604,90 +635,118 @@ function analyzeActivity(text){
       return;
     }
 
-    // === FOOD DATABASE (per 100g) — kcal, protein, carbs, fat, fiber, sugar ===
+    // === FOOD DATABASE (per 100g) — kcal, protein, carbs, fat, fiber, sugar. unit = avg grams for "1 of it" if countable ===
     const FOOD_DB=[
       {k:["poulet","blanc de poulet","escalope de poulet"],kcal:165,p:31,c:0,f:3.6,fi:0,su:0},
       {k:["dinde","escalope de dinde"],kcal:135,p:29,c:0,f:1,fi:0,su:0},
       {k:["boeuf","steak","boeuf hache","steak hache"],kcal:250,p:26,c:0,f:17,fi:0,su:0},
       {k:["saumon"],kcal:208,p:20,c:0,f:13,fi:0,su:0},
       {k:["thon"],kcal:132,p:28,c:0,f:1,fi:0,su:0},
-      {k:["oeuf","oeufs"],kcal:155,p:13,c:1.1,f:11,fi:0,su:1.1},
+      {k:["sardine","sardines"],kcal:208,p:24.6,c:0,f:11.5,fi:0,su:0,unit:22},
+      {k:["oeuf","oeufs","œuf","œufs"],kcal:155,p:13,c:1.1,f:11,fi:0,su:1.1,unit:50},
       {k:["riz","riz blanc","riz complet","riz basmati"],kcal:130,p:2.7,c:28,f:0.3,fi:0.4,su:0.1},
       {k:["pates","pâtes","spaghetti","penne"],kcal:131,p:5,c:25,f:1.1,fi:1.8,su:0.6},
-      {k:["pain","baguette","tranche de pain"],kcal:265,p:9,c:49,f:3.2,fi:2.7,su:5},
-      {k:["patate","pomme de terre","pommes de terre"],kcal:77,p:2,c:17,f:0.1,fi:2.2,su:0.8},
-      {k:["patate douce","pommes de terre douce"],kcal:86,p:1.6,c:20,f:0.1,fi:3,su:4.2},
+      {k:["pain","baguette","tranche de pain"],kcal:265,p:9,c:49,f:3.2,fi:2.7,su:5,unit:30},
+      {k:["patate","pomme de terre","pommes de terre"],kcal:77,p:2,c:17,f:0.1,fi:2.2,su:0.8,unit:150},
+      {k:["patate douce","pommes de terre douce"],kcal:86,p:1.6,c:20,f:0.1,fi:3,su:4.2,unit:150},
       {k:["quinoa"],kcal:120,p:4.4,c:21,f:1.9,fi:2.8,su:0.9},
       {k:["avoine","flocons d'avoine","porridge"],kcal:389,p:16.9,c:66,f:6.9,fi:10.6,su:0},
       {k:["fromage blanc","skyr"],kcal:75,p:11,c:4,f:0.5,fi:0,su:4},
-      {k:["yaourt","yaourt nature"],kcal:61,p:3.5,c:4.7,f:3.3,fi:0,su:4.7},
+      {k:["yaourt","yaourt nature"],kcal:61,p:3.5,c:4.7,f:3.3,fi:0,su:4.7,unit:125},
       {k:["lait"],kcal:42,p:3.4,c:5,f:1,fi:0,su:5},
-      {k:["fromage"],kcal:350,p:25,c:1.3,f:28,fi:0,su:0.5},
-      {k:["banane"],kcal:89,p:1.1,c:23,f:0.3,fi:2.6,su:12},
-      {k:["pomme"],kcal:52,p:0.3,c:14,f:0.2,fi:2.4,su:10},
-      {k:["fraise","fraises"],kcal:32,p:0.7,c:7.7,f:0.3,fi:2,su:4.9},
-      {k:["orange"],kcal:47,p:0.9,c:12,f:0.1,fi:2.4,su:9.4},
+      {k:["fromage"],kcal:350,p:25,c:1.3,f:28,fi:0,su:0.5,unit:30},
+      {k:["banane"],kcal:89,p:1.1,c:23,f:0.3,fi:2.6,su:12,unit:120},
+      {k:["pomme"],kcal:52,p:0.3,c:14,f:0.2,fi:2.4,su:10,unit:180},
+      {k:["fraise","fraises"],kcal:32,p:0.7,c:7.7,f:0.3,fi:2,su:4.9,unit:12},
+      {k:["orange"],kcal:47,p:0.9,c:12,f:0.1,fi:2.4,su:9.4,unit:200},
+      {k:["kiwi","kiwis"],kcal:61,p:1.1,c:15,f:0.5,fi:3,su:9,unit:70},
+      {k:["mangue"],kcal:60,p:0.8,c:15,f:0.4,fi:1.6,su:14,unit:200},
+      {k:["poire","poires"],kcal:57,p:0.4,c:15,f:0.1,fi:3.1,su:10,unit:180},
+      {k:["raisin","raisins"],kcal:69,p:0.7,c:18,f:0.2,fi:0.9,su:16},
       {k:["brocoli"],kcal:34,p:2.8,c:7,f:0.4,fi:2.6,su:1.7},
-      {k:["carotte","carottes"],kcal:41,p:0.9,c:10,f:0.2,fi:2.8,su:4.7},
+      {k:["carotte","carottes"],kcal:41,p:0.9,c:10,f:0.2,fi:2.8,su:4.7,unit:60},
       {k:["salade","laitue"],kcal:15,p:1.4,c:2.9,f:0.2,fi:1.3,su:0.8},
-      {k:["tomate","tomates"],kcal:18,p:0.9,c:3.9,f:0.2,fi:1.2,su:2.6},
+      {k:["tomate","tomates"],kcal:18,p:0.9,c:3.9,f:0.2,fi:1.2,su:2.6,unit:120},
+      {k:["concombre","concombres"],kcal:15,p:0.7,c:3.6,f:0.1,fi:0.5,su:1.7,unit:250},
       {k:["haricot vert","haricots verts"],kcal:31,p:1.8,c:7,f:0.2,fi:3.4,su:3.3},
       {k:["lentilles"],kcal:116,p:9,c:20,f:0.4,fi:7.9,su:1.8},
       {k:["pois chiche","pois chiches"],kcal:164,p:8.9,c:27,f:2.6,fi:7.6,su:4.8},
-      {k:["amande","amandes"],kcal:579,p:21,c:22,f:50,fi:12.5,su:4.4},
-      {k:["noix"],kcal:654,p:15,c:14,f:65,fi:6.7,su:2.6},
+      {k:["amande","amandes"],kcal:579,p:21,c:22,f:50,fi:12.5,su:4.4,unit:1.2},
+      {k:["noix"],kcal:654,p:15,c:14,f:65,fi:6.7,su:2.6,unit:5},
       {k:["cacahuete","cacahuetes","beurre de cacahuete"],kcal:588,p:25,c:20,f:50,fi:8,su:5},
       {k:["huile d'olive","huile"],kcal:884,p:0,c:0,f:100,fi:0,su:0},
-      {k:["avocat"],kcal:160,p:2,c:9,f:15,fi:6.7,su:0.7},
+      {k:["avocat"],kcal:160,p:2,c:9,f:15,fi:6.7,su:0.7,unit:200},
       {k:["chocolat","chocolat noir"],kcal:546,p:4.9,c:61,f:31,fi:7,su:48},
-      {k:["pizza"],kcal:266,p:11,c:33,f:10,fi:2.3,su:3.6},
-      {k:["burger"],kcal:295,p:17,c:24,f:14,fi:1.3,su:5},
+      {k:["pizza"],kcal:266,p:11,c:33,f:10,fi:2.3,su:3.6,unit:700},
+      {k:["burger"],kcal:295,p:17,c:24,f:14,fi:1.3,su:5,unit:250},
       {k:["frites","frite"],kcal:312,p:3.4,c:41,f:15,fi:3.8,su:0.3},
-      {k:["kebab"],kcal:250,p:15,c:20,f:12,fi:1.5,su:2},
+      {k:["kebab"],kcal:250,p:15,c:20,f:12,fi:1.5,su:2,unit:400},
       {k:["chips"],kcal:536,p:6.6,c:53,f:34,fi:4.4,su:0.2},
       {k:["glace"],kcal:207,p:3.5,c:24,f:11,fi:0.7,su:21},
       {k:["gateau","gâteau"],kcal:350,p:5,c:50,f:15,fi:1,su:30},
       {k:["bonbon","bonbons"],kcal:390,p:0,c:98,f:0.2,fi:0,su:75},
       {k:["shake proteine","whey","proteine en poudre"],kcal:400,p:80,c:8,f:5,fi:1,su:4},
       {k:["pate a tartiner","nutella"],kcal:539,p:6.3,c:57,f:31,fi:3.4,su:56},
-      {k:["fanta","coca","coca cola","soda","limonade","sprite"],kcal:42,p:0,c:10.6,f:0,fi:0,su:10.6},
-      {k:["jus de fruit","jus d'orange","jus de pomme"],kcal:45,p:0.5,c:10,f:0.1,fi:0.2,su:9},
+      {k:["fanta","coca","coca cola","soda","limonade","sprite"],kcal:42,p:0,c:10.6,f:0,fi:0,su:10.6,unit:330},
+      {k:["jus de fruit","jus d'orange","jus de pomme"],kcal:45,p:0.5,c:10,f:0.1,fi:0.2,su:9,unit:200},
     ];
 
-    // === Detect food entries with grams/ml/portions and compute macro totals ===
+    // === Detect food entries with grams/ml/portions/counts and compute macro totals ===
     // grams and ml (ml treated ~1g/ml, close enough for drinks/liquids)
     const gramMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*(?:g(?:r|rammes?)?|ml|millilitres?)\b/g)];
-    // whole-unit words: "1 pizza", "2 parts", "1 tranche" — mapped to a reasonable default gram estimate per unit
-    const unitDefaults={
+    // generic whole-unit words not tied to a specific food (part/tranche/portion/verre/canette)
+    const genericUnitDefaults={
       "part":250,"parts":250,"tranche":80,"tranches":80,
-      "pizza":700,"pizzas":700, // whole pizza ≈ 700g
-      "burger":250,"burgers":250,
-      "verre":200,"verres":200,"canette":330,"cannette":330,
+      "verre":200,"verres":200,"canette":330,"cannette":330,"portion":150,"portions":150,
     };
-    const unitMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*(part|parts|tranche|tranches|pizza|pizzas|burger|burgers|verre|verres|canette|cannette)\b/g)];
+    const genericUnitMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s*(part|parts|tranche|tranches|verre|verres|canette|cannette|portion|portions)\b/g)];
+    // bare counts near a food word: "3 œufs", "1 kiwi", "2 sardines" — any number directly followed by words, matched against food.unit
+    const bareCountMatches=[...t.matchAll(/(\d+[\.,]?\d*)\s+/g)];
 
     let macroTotals=null;
-    if(gramMatches.length>0||unitMatches.length>0){
+    if(gramMatches.length>0||genericUnitMatches.length>0||bareCountMatches.length>0){
       macroTotals={kcal:0,p:0,c:0,f:0,fi:0,su:0,matched:false};
       for(const food of FOOD_DB){
         for(const kw of food.k){
           const idx=t.indexOf(kw);
           if(idx===-1)continue;
           let bestGram=null,bestDist=Infinity;
+          // 1) explicit grams/ml — must PRECEDE the food word (French: "400g de pâtes"), closest one wins
           for(const gm of gramMatches){
-            const dist=Math.abs(gm.index-idx);
-            if(dist<bestDist&&dist<25){bestDist=dist;bestGram=parseFloat(gm[1].replace(",","."));}
-          }
-          for(const um of unitMatches){
-            const dist=Math.abs(um.index-idx);
-            if(dist<bestDist&&dist<25){
-              const qty=parseFloat(um[1].replace(",","."));
-              const perUnit=unitDefaults[um[2]]||150;
-              bestDist=dist;bestGram=qty*perUnit;
+            const gEnd=gm.index+gm[0].length;
+            if(gEnd<=idx){
+              const dist=idx-gEnd;
+              if(dist<bestDist&&dist<15){bestDist=dist;bestGram=parseFloat(gm[1].replace(",","."));}
             }
           }
-          // Fallback: mentioning a whole food item with no quantity at all nearby gets a default single-serving estimate
-          if(!bestGram&&unitDefaults[kw]){bestGram=unitDefaults[kw];}
+          // 2) generic unit words (part/tranche/verre/canette) — same preceding rule
+          if(bestGram===null){
+            for(const um of genericUnitMatches){
+              const uEnd=um.index+um[0].length;
+              if(uEnd<=idx){
+                const dist=idx-uEnd;
+                if(dist<bestDist&&dist<15){
+                  const qty=parseFloat(um[1].replace(",","."));
+                  bestDist=dist;bestGram=qty*(genericUnitDefaults[um[2]]||150);
+                }
+              }
+            }
+          }
+          // 3) bare count + this food's own per-unit weight ("3 œufs" -> 3 * 50g) — same preceding rule, tighter window
+          if(bestGram===null&&food.unit){
+            for(const bm of bareCountMatches){
+              const bEnd=bm.index+bm[0].length;
+              if(bEnd<=idx){
+                const dist=idx-bEnd;
+                if(dist<bestDist&&dist<10){
+                  const qty=parseFloat(bm[1].replace(",","."));
+                  bestDist=dist;bestGram=qty*food.unit;
+                }
+              }
+            }
+          }
+          // 4) food mentioned with a defined unit weight but no number at all nearby -> assume "1"
+          if(bestGram===null&&food.unit){bestGram=food.unit;}
           if(bestGram){
             const ratio=bestGram/100;
             macroTotals.kcal+=food.kcal*ratio;
@@ -754,22 +813,15 @@ function analyzeActivity(text){
       {k:["alcool","biere","bière","du vin","verre de vin","cocktail","soiree arrosee","soirée arrosée"],i:{...Z,corps:-5,nutrition:-7,cerveau:-4,apparence:-3,discipline:-6},nutriFallback:true},
       {k:["de l'eau","d'eau","hydrat","bu de l'eau"],i:{...Z,corps:3,nutrition:5,cerveau:1,apparence:3,discipline:2},nutriFallback:true},
 
-      // === CERVEAU ===
-      {k:["livre","lire","lu","lecture","roman","bouquin","bd","manga","essai"],i:{...Z,cerveau:10,discipline:6}},
-      {k:["echecs en ligne","chess.com","lichess","echecs online"],i:{...Z,cerveau:11,discipline:5,social:3}},
-      {k:["echecs","chess","jeu de reflexion","sudoku","puzzle","enigme","mots croises","scrabble"],i:{...Z,cerveau:10,discipline:6}},
-      {k:["japonais","kanji","hiragana","katakana","duolingo","langue","apprendre","vocabulaire"],i:{...Z,cerveau:11,discipline:7}},
+      // === CERVEAU (fallback — lecture/japonais/codage/echecs/meditation/travail handled above with bell curves) ===
       {k:["documentaire","docu","reportage"],i:{...Z,cerveau:8,discipline:3}},
       {k:["podcast educatif","podcast eduquant"],i:{...Z,cerveau:9,discipline:5}},
       {k:["podcast","conference","ted","ted talk","cours en ligne","mooc","formation","webinaire"],i:{...Z,cerveau:8,discipline:5}},
       {k:["dessin","dessiner","sketch","croquis","illustrer","illustré","aquarelle","peinture","peindre"],i:{...Z,cerveau:7,apparence:2,discipline:5}},
-      {k:["coder","programmer","code","dev","développer","javascript","python","html"],i:{...Z,cerveau:11,discipline:7}},
-      {k:["ecrire","rediger","journal","blog","dissertation","poeme","poésie"],i:{...Z,cerveau:8,discipline:5}},
       {k:["apprendre la guitare","apprentissage guitare","apprendre le piano","apprentissage piano","cours de musique","gamme","solfege"],i:{...Z,cerveau:9,apparence:1,discipline:7}},
       {k:["music","musique","guitare","piano","instrument","jouer de","batterie","violon","chant","chanter"],i:{...Z,cerveau:7,apparence:1,discipline:6}},
-      {k:["meditation","mediter","pleine conscience","mindfulness","respiration"],i:{...Z,corps:2,cerveau:7,discipline:8}},
       {k:["prier","priere","spirituel"],i:{...Z,cerveau:4,discipline:5}},
-      {k:["géographie","histoire","science","biologie","physique","chimie","maths","revise","révision","etude","étude"],i:{...Z,cerveau:9,discipline:7}},
+      {k:["géographie","histoire","science","biologie","physique","chimie","maths"],i:{...Z,cerveau:9,discipline:5}},
 
       // === APPARENCE / STYLE ===
       {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{...Z,cerveau:1,apparence:7,discipline:2}},
