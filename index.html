@@ -171,6 +171,11 @@ const RD=[
   {id:"match",icon:"⚽",label:"Match / épisode tard le soir"},
   {id:"series",icon:"📺",label:"2 épisodes série bonus"},
 ];
+const SCREEN_APPS=[
+  {id:"snap",icon:"👻",label:"Snapchat",baseMin:5,maxMin:50,color:C.gold},
+  {id:"coc",icon:"⚔️",label:"Clash of Clans",baseMin:5,maxMin:40,color:C.violet},
+  {id:"insta",icon:"📸",label:"Instagram",baseMin:5,maxMin:30,color:C.fuchsia},
+];
 const RP=[
   {id:"p3",icon:"🎮",label:"Récompenses quotidiennes débloquées",lvl:3},
   {id:"p8",icon:"🇯🇵",label:"Budget Japon (Pokémon, mangas, figurines)",lvl:8},
@@ -236,6 +241,7 @@ const mkDef=()=>({
   nocturneStreak:0,conscienceCleanStreak:0,proteinStreak:0,veggieStreak:0,
   history:[],
   catBase:{corps:50,nutrition:50,cerveau:50,apparence:50,discipline:50,social:50},
+  screenUsage:{},
   records:{bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0},
   weeklyChallenge:null, // {weekKey, cat, habitId, goal, current, xpReward, done, claimed}
   dailyXPGained:0, dailyXPDate:null,
@@ -823,13 +829,13 @@ function analyzeActivity(text){
       {k:["prier","priere","spirituel"],i:{...Z,cerveau:4,discipline:5}},
       {k:["géographie","histoire","science","biologie","physique","chimie","maths"],i:{...Z,cerveau:9,discipline:5}},
 
-      // === APPARENCE / STYLE ===
-      {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{...Z,cerveau:1,apparence:7,discipline:2}},
-      {k:["coiffeur","coupe","cheveux"],i:{...Z,apparence:8,discipline:2}},
-      {k:["soin","skincare","creme","masque visage","nettoyant"],i:{...Z,corps:1,apparence:9,discipline:4}},
-      {k:["rasage","raser","rasé"],i:{...Z,apparence:6,discipline:3}},
-      {k:["parfum","cologne"],i:{...Z,apparence:5,discipline:2}},
-      {k:["douche","bain","laver"],i:{...Z,corps:2,apparence:7,discipline:3}},
+      // === APPARENCE / STYLE (flat punctual actions — no duration scaling, doing it once counts regardless of time spent) ===
+      {k:["shopping","achat","achete","magasin","vetement","fringues","habit","tenue"],i:{...Z,cerveau:1,apparence:7,discipline:2},flat:true},
+      {k:["coiffeur","coupe","cheveux"],i:{...Z,apparence:8,discipline:2},flat:true},
+      {k:["soin","skincare","creme","masque visage","nettoyant"],i:{...Z,corps:1,apparence:9,discipline:4},flat:true},
+      {k:["rasage","raser","rasé"],i:{...Z,apparence:6,discipline:3},flat:true},
+      {k:["parfum","cologne"],i:{...Z,apparence:5,discipline:2},flat:true},
+      {k:["douche","bain","laver"],i:{...Z,corps:2,apparence:7,discipline:3},flat:true},
 
       // === DISCIPLINE / PRODUCTIVITE ===
       {k:["ranger","nettoyé","nettoyage","ménage","aspirateur","vaisselle","chambre"],i:{...Z,corps:1,cerveau:1,apparence:2,discipline:7}},
@@ -887,7 +893,7 @@ function analyzeActivity(text){
 
     // Apply duration multiplier (and intensity for sport entries) and round
     const raw=bestMatch.i;
-    const effMul=bestMatch.sport?mul*sportIntensityMul:mul;
+    const effMul=bestMatch.flat?1:(bestMatch.sport?mul*sportIntensityMul:mul);
     const result={};
     for(const k of Object.keys(Z)){
       const v=(raw[k]||0)*effMul;
@@ -1373,9 +1379,44 @@ function Profile({s,lvl,rank,gs,cs}){
 }
 
 // ── REWARDS ──
-function Rewards({s,lvl,cc,update,showT}){
+function Rewards({s,lvl,cc,gs,update,showT}){
   const dc=s.debt===0,du=lvl.lvl>=3&&cc&&dc;
+  const screenUsage=s.screenUsage||{};
+
+  const useMinutes=(appId,amount)=>{
+    update(p=>{
+      const usage={...(p.screenUsage||{})};
+      usage[appId]=(usage[appId]||0)+amount;
+      return{...p,screenUsage:usage};
+    });
+  };
+
   return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <Crd>
+      <Lbl>📱 TEMPS D'ÉCRAN DÉBLOQUÉ</Lbl>
+      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:14}}>
+        Basé sur ton score du jour ({gs}%) — plus tu avances, plus tu débloques.
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {SCREEN_APPS.map(app=>{
+          const unlocked=Math.round(app.baseMin+(app.maxMin-app.baseMin)*(gs/100));
+          const used=screenUsage[app.id]||0;
+          const remaining=Math.max(0,unlocked-used);
+          const pctUsed=Math.min(100,(used/unlocked)*100);
+          return<div key={app.id}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:14,fontWeight:700}}>{app.icon} {app.label}</span>
+              <span style={{fontSize:13,fontWeight:800,color:remaining>0?app.color:C.sub}}>{remaining} min restantes</span>
+            </div>
+            <Br val={pctUsed} max={100} color={app.color}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+              <span style={{fontSize:10,color:C.sub}}>{used}/{unlocked} min utilisées aujourd'hui</span>
+              {remaining>0&&<button onClick={()=>useMinutes(app.id,5)} style={{background:"none",border:`1px solid ${app.color}`,borderRadius:10,padding:"3px 10px",fontSize:11,color:app.color,fontWeight:700,cursor:"pointer"}}>-5min utilisées</button>}
+            </div>
+          </div>;
+        })}
+      </div>
+    </Crd>
     <Crd>
       <Lbl>RÉCOMPENSES QUOTIDIENNES</Lbl>
       <div style={{fontSize:12,color:du?C.emerald:C.rose,marginTop:6,marginBottom:12,fontWeight:600}}>
@@ -1850,6 +1891,7 @@ function App(){
           p.sleepBedtime=null;p.sleepWake=null;
           p.eveningDone=false;p.eveningNote={good:"",improve:""};
           p.catBase=computeNextDayBase(dayCats);
+          p.screenUsage={};
           p.activities=[];p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
           p.todayKey=TODAY();
           const nb=chkBadges(p);if(nb.length){p.unlockedBadges=[...(p.unlockedBadges||[]),...nb];p.newBadges=nb;}
@@ -1858,6 +1900,7 @@ function App(){
         if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
         if(!p.history)p.history=[];
         if(!p.catBase)p.catBase={corps:50,nutrition:50,cerveau:50,apparence:50,discipline:50,social:50};
+        if(!p.screenUsage)p.screenUsage={};
         if(!p.records)p.records={bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0};
         if(!p.weeklyChallenge||p.weeklyChallenge.weekKey!==getWeekKey())p.weeklyChallenge=generateWeeklyChallenge();
         if(p.dailyXPGained===undefined)p.dailyXPGained=0;
@@ -1951,7 +1994,7 @@ function App(){
       {tab==="habits"&&<Habits s={s} update={update} showT={showT} sp={sp}/>}
       {tab==="epic"&&<Epic s={s} update={update} showT={showT}/>}
       {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank} gs={gs} cs={cs}/>}
-      {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} update={update} showT={showT}/>}
+      {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} gs={gs} update={update} showT={showT}/>}
       {tab==="journal"&&<Journal s={s} update={update} showT={showT}/>}
       {tab==="settings"&&<Settings s={s} update={update} showT={showT}/>}
     </div>
