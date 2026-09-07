@@ -166,8 +166,6 @@ const EQ_DEF=[
 ];
 
 const RD=[
-  {id:"gaming",icon:"🎮",label:"1h de jeux vidéos"},
-  {id:"scroll",icon:"📱",label:"30 min de scroll libre"},
   {id:"match",icon:"⚽",label:"Match / épisode tard le soir"},
   {id:"series",icon:"📺",label:"2 épisodes série bonus"},
 ];
@@ -837,11 +835,9 @@ function analyzeActivity(text){
       {k:["parfum","cologne"],i:{...Z,apparence:5,discipline:2},flat:true},
       {k:["douche","bain","laver"],i:{...Z,corps:2,apparence:7,discipline:3},flat:true},
 
-      // === DISCIPLINE / PRODUCTIVITE ===
-      {k:["ranger","nettoyé","nettoyage","ménage","aspirateur","vaisselle","chambre"],i:{...Z,corps:1,cerveau:1,apparence:2,discipline:7}},
-      {k:["planifier","planning","organisation","organiser","objectif","agenda","todo"],i:{...Z,cerveau:4,discipline:9}},
-      {k:["reveil","lever","debout","matin"],i:{...Z,corps:1,cerveau:1,discipline:7}},
-      {k:["travail","bosser","boulot","stage","job"],i:{...Z,cerveau:5,discipline:8}},
+      // === DISCIPLINE / PRODUCTIVITE (flat punctual actions — travail/révisions handled above with bell curve) ===
+      {k:["ranger","nettoyé","nettoyage","ménage","aspirateur","vaisselle","chambre"],i:{...Z,corps:1,cerveau:1,apparence:2,discipline:7},flat:true},
+      {k:["planifier","planning","organisation","organiser","objectif","agenda","todo"],i:{...Z,cerveau:4,discipline:9},flat:true},
 
       // === SOCIAL ===
       {k:["famille","parent","frere","soeur","grand-mere","grand-pere","cousin"],i:{...Z,cerveau:2,discipline:1,social:9}},
