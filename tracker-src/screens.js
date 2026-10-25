@@ -16,7 +16,7 @@ function WeeklyChallengeCard({wc,update,showT}){
     showT(`🏆 +${wc.xpReward} XP réclamés !`,C.gold,3000);
   };
   return<div style={{
-    background:`linear-gradient(135deg, ${cat.color}22, ${C.card2})`,
+    background:`linear-gradient(135deg, ${cat.color}22, ${C.card})`,
     border:`1.5px solid ${cat.color}55`,borderRadius:18,padding:16,
     boxShadow:`0 4px 0 ${cat.color}33, 0 8px 20px -6px ${cat.color}40`,
     position:"relative",overflow:"hidden"
@@ -41,7 +41,7 @@ function WeeklyChallengeCard({wc,update,showT}){
   </div>;
 }
 
-function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
+function Dashboard({s,gs,lvl,rank,update,showT,cc}){
   const[eo,setEo]=useState(false);
   const[good,setGood]=useState(s.eveningNote?.good||"");
   const[imp,setImp]=useState(s.eveningNote?.improve||"");
@@ -52,6 +52,8 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
     if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
     return(s.coreProgress?.[h.id]||0)>=h.goal;
   }).length;
+
+  const hc=computeHabitCompletion(s);
 
   return<div style={{display:"flex",flexDirection:"column",gap:14,}}>
     {/* Weekly challenge */}
@@ -72,42 +74,19 @@ function Dashboard({s,cs,gs,lvl,rank,update,showT,cc}){
       <Br val={gs} max={100} color={getScoreColor(gs)} glow/>
     </Crd>
 
-    {/* No activity logged today reminder */}
-    {(!s.activities||s.activities.length===0)&&<div style={{
-      background:`${C.amber}14`,border:`1px solid ${C.amber}40`,borderRadius:14,
-      padding:"12px 14px",display:"flex",alignItems:"center",gap:10
-    }}>
-      <span style={{fontSize:20}}>✏️</span>
-      <div>
-        <div style={{fontSize:12,fontWeight:700,color:C.amber}}>Rien noté dans le Journal aujourd'hui</div>
-        <div style={{fontSize:11,color:C.sub,marginTop:2}}>Ton score va doucement dériver vers 50% tant que tu n'as rien logué.</div>
-      </div>
-    </div>}
-
-    {/* Category scores — constellation of rings */}
+    {/* Category completion — based on habits, no Journal needed */}
     <Crd>
       <Lbl>PAR CATÉGORIE</Lbl>
-      <div style={{fontSize:11,color:C.sub,marginTop:4,marginBottom:16}}>Basé sur ce que tu notes dans le Journal — pas sur tes habitudes cochées.</div>
-
-      <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",padding:"10px 0"}}>
-        {/* Central global ring */}
-        <Ring value={gs} size={92} strokeWidth={9} color={getScoreColor(gs)} glow>
-          <div style={{fontSize:22,fontWeight:900,color:getScoreColor(gs)}}><CountUp value={gs}/></div>
-          <div style={{fontSize:8,color:C.sub,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>Global</div>
-        </Ring>
-      </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginTop:18}}>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
         {Object.entries(CATS).map(([k,cat])=>{
-          const bonus=s.activityImpacts?.[k]||0;
-          const total=cs[k]||0;
-          const color=getScoreColor(total);
-          return<div key={k} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-            <Ring value={total} size={58} strokeWidth={6} color={color}>
-              <div style={{fontSize:13,fontWeight:800,color}}><CountUp value={total}/></div>
-            </Ring>
-            <div style={{fontSize:10,color:C.sub,fontWeight:600,textAlign:"center"}}>{cat.icon} {cat.label}</div>
-            {bonus!==0&&<ImpactPill cat={k} val={bonus}/>}
+          const val=hc[k]||0;
+          const color=getScoreColor(val);
+          return<div key={k}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+              <span>{cat.icon} {cat.label}</span>
+              <span style={{color,fontWeight:700}}><CountUp value={val} suffix="%"/></span>
+            </div>
+            <Br val={val} max={100} color={color} h={5}/>
           </div>;
         })}
       </div>
@@ -322,20 +301,11 @@ function Epic({s,update,showT}){
 }
 
 // ── PROFILE ──
-// ── HISTORY CHART ──
-function HistoryChart({s,gs,cs}){
+// ── HISTORY CHART (score global uniquement — % d'habitudes complétées) ──
+function HistoryChart({s,gs}){
   const[range,setRange]=useState(7);
-  const[cat,setCat]=useState("global");
   const hist=s.history||[];
-  const catColor=cat==="global"?C.violet:(CATS[cat]?.color||C.violet);
 
-  const getScoreFor=(entry,isToday)=>{
-    if(cat==="global")return isToday?gs:entry?.score??null;
-    if(isToday)return cs?.[cat]??null;
-    return entry?.cats?.[cat]??null;
-  };
-
-  // Build the last N days including today
   const days=[];
   for(let i=range-1;i>=0;i--){
     const d=new Date();
@@ -343,7 +313,7 @@ function HistoryChart({s,gs,cs}){
     const key=fmtLocalDate(d);
     const isToday=key===TODAY();
     const found=hist.find(h=>h.date===key);
-    days.push({date:key,score:getScoreFor(found,isToday),isToday});
+    days.push({date:key,score:isToday?gs:(found?.score??null),isToday});
   }
 
   const validDays=days.filter(d=>d.score!==null&&d.score!==undefined);
@@ -364,12 +334,8 @@ function HistoryChart({s,gs,cs}){
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
       <Lbl>HISTORIQUE</Lbl>
       <div style={{display:"flex",gap:6}}>
-        {[7,30].map(r=><button key={r} onClick={()=>setRange(r)} style={{background:range===r?catColor:C.surface,color:range===r?"#fff":C.sub,border:`1px solid ${range===r?catColor:C.border}`,borderRadius:16,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{r}j</button>)}
+        {[7,30].map(r=><button key={r} onClick={()=>setRange(r)} style={{background:range===r?C.violet:C.surface,color:range===r?"#fff":C.sub,border:`1px solid ${range===r?C.violet:C.border}`,borderRadius:16,padding:"3px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{r}j</button>)}
       </div>
-    </div>
-    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:10}}>
-      <button onClick={()=>setCat("global")} style={{background:cat==="global"?C.violet:C.surface,color:cat==="global"?"#fff":C.sub,border:`1px solid ${cat==="global"?C.violet:C.border}`,borderRadius:14,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>🌐 Global</button>
-      {Object.entries(CATS).map(([k,c])=><button key={k} onClick={()=>setCat(k)} style={{background:cat===k?c.color:C.surface,color:cat===k?"#fff":C.sub,border:`1px solid ${cat===k?c.color:C.border}`,borderRadius:14,padding:"4px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>{c.icon} {c.label}</button>)}
     </div>
     <div style={{display:"flex",alignItems:"baseline",gap:8,margin:"10px 0 12px"}}>
       <span style={{fontSize:26,fontWeight:900,color:getScoreColor(avg)}}>{avg}%</span>
@@ -379,15 +345,15 @@ function HistoryChart({s,gs,cs}){
       <div style={{textAlign:"center",padding:"20px 10px",color:C.sub,fontSize:12}}>Pas encore assez d'historique — reviens demain pour voir ta courbe !</div>
       :<svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:100,overflow:"visible"}}>
         <defs>
-          <linearGradient id={`histGrad-${cat}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={catColor} stopOpacity="0.35"/>
-            <stop offset="100%" stopColor={catColor} stopOpacity="0"/>
+          <linearGradient id="histGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={C.violet} stopOpacity="0.35"/>
+            <stop offset="100%" stopColor={C.violet} stopOpacity="0"/>
           </linearGradient>
         </defs>
         {[0,50,100].map(v=>{const y=pad+(h-pad*2)*(1-v/100);return<line key={v} x1={pad} y1={y} x2={w-pad} y2={y} stroke={C.border} strokeWidth="1" strokeDasharray="2,3"/>;})}
-        {areaD&&<path d={areaD} fill={`url(#histGrad-${cat})`}/>}
-        {pathD&&<path d={pathD} fill="none" stroke={catColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
-        {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={p.isToday?4:2.5} fill={p.isToday?C.gold:catColor} stroke={C.bg} strokeWidth="1.5"/>)}
+        {areaD&&<path d={areaD} fill="url(#histGrad)"/>}
+        {pathD&&<path d={pathD} fill="none" stroke={C.violet} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>}
+        {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={p.isToday?4:2.5} fill={p.isToday?C.gold:C.violet} stroke={C.bg} strokeWidth="1.5"/>)}
       </svg>
     }
     {validDays.length>=2&&<div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:9,color:C.sub}}>
@@ -420,7 +386,7 @@ function RecordsCard({s}){
   </Crd>;
 }
 
-function Profile({s,lvl,rank,gs,cs}){
+function Profile({s,lvl,rank,gs}){
   const ul=s.unlockedBadges||[];
   const[filter,setFilter]=useState("all");
   const cats=["all","Corps","Cerveau","Nutrition","Style","Discipline","Légendaire"];
@@ -453,7 +419,7 @@ function Profile({s,lvl,rank,gs,cs}){
     </div>
 
     {/* History chart */}
-    <HistoryChart s={s} gs={gs} cs={cs}/>
+    <HistoryChart s={s} gs={gs}/>
 
     {/* Personal records */}
     <RecordsCard s={s}/>
@@ -482,44 +448,10 @@ function Profile({s,lvl,rank,gs,cs}){
 }
 
 // ── REWARDS ──
-function Rewards({s,lvl,cc,gs,update,showT}){
+function Rewards({s,lvl,cc,update,showT}){
   const dc=s.debt===0,du=lvl.lvl>=3&&cc&&dc;
-  const screenUsage=s.screenUsage||{};
-
-  const useMinutes=(appId,amount)=>{
-    update(p=>{
-      const usage={...(p.screenUsage||{})};
-      usage[appId]=(usage[appId]||0)+amount;
-      return{...p,screenUsage:usage};
-    });
-  };
 
   return<div style={{display:"flex",flexDirection:"column",gap:14}}>
-    <Crd>
-      <Lbl>📱 TEMPS D'ÉCRAN DÉBLOQUÉ</Lbl>
-      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:14}}>
-        Basé sur ton score du jour ({gs}%) — plus tu avances, plus tu débloques.
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:14}}>
-        {SCREEN_APPS.map(app=>{
-          const unlocked=Math.round(app.baseMin+(app.maxMin-app.baseMin)*(gs/100));
-          const used=screenUsage[app.id]||0;
-          const remaining=Math.max(0,unlocked-used);
-          const pctUsed=Math.min(100,(used/unlocked)*100);
-          return<div key={app.id}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <span style={{fontSize:14,fontWeight:700}}>{app.icon} {app.label}</span>
-              <span style={{fontSize:13,fontWeight:800,color:remaining>0?app.color:C.sub}}>{remaining} min restantes</span>
-            </div>
-            <Br val={pctUsed} max={100} color={app.color}/>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
-              <span style={{fontSize:10,color:C.sub}}>{used}/{unlocked} min utilisées aujourd'hui</span>
-              {remaining>0&&<button onClick={()=>useMinutes(app.id,5)} style={{background:"none",border:`1px solid ${app.color}`,borderRadius:10,padding:"3px 10px",fontSize:11,color:app.color,fontWeight:700,cursor:"pointer"}}>-5min utilisées</button>}
-            </div>
-          </div>;
-        })}
-      </div>
-    </Crd>
     <Crd>
       <Lbl>RÉCOMPENSES QUOTIDIENNES</Lbl>
       <div style={{fontSize:12,color:du?C.emerald:C.rose,marginTop:6,marginBottom:12,fontWeight:600}}>
@@ -546,239 +478,60 @@ function Rewards({s,lvl,cc,gs,update,showT}){
 }
 
 // ── JOURNAL (Activities + Conscience) ──
-function Journal({s,update,showT}){
-  const[section,setSection]=useState("activities");
-  const[input,setInput]=useState("");
-  const[loading,setLoading]=useState(false);
-  const[editingId,setEditingId]=useState(null);
-  const[editVals,setEditVals]=useState({});
-
-  const analyze=async()=>{
-    if(!input.trim())return;
-    setLoading(true);
-    try{
-      const raw=await analyzeActivity(input.trim());
-      const{_macros,...impacts}=raw;
-      const activity={id:Date.now(),text:input.trim(),impacts,originalImpacts:impacts,adjusted:false,macros:_macros||null,time:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
-      update(p=>{
-        const newActivities=[...(p.activities||[]),activity];
-        const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
-        newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
-        return{...p,activities:newActivities,activityImpacts:newImpacts};
-      });
-      showT("Activité analysée !",C.sky);
-      setInput("");
-    }catch(e){showT("Erreur d'analyse",C.red);}
-    setLoading(false);
-  };
-
-  const removeActivity=(id)=>{
-    update(p=>{
-      const newActivities=(p.activities||[]).filter(a=>a.id!==id);
-      const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
-      newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
-      return{...p,activities:newActivities,activityImpacts:newImpacts};
-    });
-  };
-
-  const startEdit=(activity)=>{
-    setEditingId(activity.id);
-    setEditVals({...activity.impacts});
-  };
-
-  const cancelEdit=()=>{setEditingId(null);setEditVals({});};
-
-  const saveEdit=()=>{
-    update(p=>{
-      const newActivities=(p.activities||[]).map(a=>a.id===editingId?{...a,impacts:{...editVals},adjusted:true}:a);
-      const newImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
-      newActivities.forEach(a=>{Object.keys(newImpacts).forEach(k=>{newImpacts[k]+=(a.impacts[k]||0);});});
-      return{...p,activities:newActivities,activityImpacts:newImpacts};
-    });
-    showT("Impact ajusté ✓",C.emerald);
-    setEditingId(null);setEditVals({});
-  };
-
-  const resetToOriginal=()=>{
-    const act=(s.activities||[]).find(a=>a.id===editingId);
-    if(act?.originalImpacts) setEditVals({...act.originalImpacts});
-  };
-
+// ── CONSCIENCE (dette/fautes, autonome — plus de lien au Journal) ──
+function Conscience({s,update,showT}){
   const addFault=f=>{update(p=>({...p,debt:p.debt+f.debt,conscience:[...(p.conscience||[]),{date:TODAY(),label:f.label,debt:f.debt}]}));showT(`+${f.debt} dette`,C.red);};
   const redeem=r=>{if(s.debt<=0){showT("Aucune dette !",C.sub);return;}update(p=>({...p,debt:Math.max(0,p.debt-r.r)}));showT(`${r.icon} Rachat ! -${r.r} dette`,C.emerald);};
-
-  const todayActs=(s.activities||[]);
-  const macroTotals=todayActs.reduce((acc,a)=>{
-    if(!a.macros)return acc;
-    acc.kcal+=a.macros.kcal;acc.p+=a.macros.p;acc.c+=a.macros.c;acc.f+=a.macros.f;acc.fi+=a.macros.fi;acc.su+=a.macros.su;
-    return acc;
-  },{kcal:0,p:0,c:0,f:0,fi:0,su:0});
-  const hasMacros=macroTotals.kcal>0;
-  const TARGETS={kcal:2800,p:155,c:325,f:80,fi:30};
   const todayFaults=(s.conscience||[]).filter(e=>e.date===TODAY());
 
   return<div style={{display:"flex",flexDirection:"column",gap:14,}}>
+    {/* Debt meter */}
+    <Crd style={{border:`1px solid ${s.debt>0?C.red:C.emerald}40`}}>
+      <Lbl>DETTE ACTUELLE</Lbl>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10}}>
+        <div style={{fontSize:48,fontWeight:900,color:s.debt>0?C.rose:C.emerald,lineHeight:1,textShadow:s.debt>0?`0 0 20px ${C.red}`:undefined}}>{s.debt}</div>
+        <div style={{fontSize:13,color:s.debt>0?C.rose:C.emerald,fontWeight:600}}>{s.debt===0?"Conscience nette 🟢":s.debt===1?"Rachat requis":`${s.debt} rachats requis`}</div>
+      </div>
+      {s.debt>0&&<div style={{marginTop:10}}><Br val={Math.min(s.debt,5)} max={5} color={C.red}/></div>}
+    </Crd>
 
-    {/* Section tabs */}
-    <div style={{display:"flex",gap:8}}>
-      {[{id:"activities",label:"⚡ Activités",color:C.sky},{id:"conscience",label:"👁️ Conscience",color:C.rose}].map(t=><button key={t.id} onClick={()=>setSection(t.id)} style={{flex:1,background:section===t.id?t.color+"22":C.surface,color:section===t.id?t.color:C.sub,border:`1px solid ${section===t.id?t.color:C.border}`,borderRadius:12,padding:"10px 0",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t.label}</button>)}
-    </div>
+    {/* Log fault */}
+    <Crd>
+      <Lbl>NOTER UNE FAUTE</Lbl>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+        {CF.map(f=><button key={f.id} onClick={()=>addFault(f)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 14px",cursor:"pointer",color:C.text,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
+          <span>{f.label}</span><span style={{color:C.rose,fontWeight:800}}>+{f.debt}</span>
+        </button>)}
+      </div>
+    </Crd>
 
-    {section==="activities"&&<>
-      {/* Activity input */}
-      <Crd>
-        <Lbl>AJOUTE UNE ACTIVITÉ</Lbl>
-        <div style={{fontSize:11,color:C.sub,marginTop:4,marginBottom:12}}>Décris ce que tu as fait — l'IA analyse l'impact sur tes catégories.</div>
-        <textarea
-          value={input}
-          onChange={e=>setInput(e.target.value)}
-          placeholder="Ex: 150g de poulet et 200g de riz, joué aux échecs 1h, scrollé TikTok 45 min, fait 50 pompes..."
-          style={{...tS,height:72}}
-        />
-        <div style={{marginTop:10}}>
-          <Btn onClick={analyze} color={loading?C.muted:C.sky} full>
-            {loading?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{display:"inline-block",width:12,height:12,border:`2px solid #fff`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>Analyse en cours...</span>:"⚡ Analyser l'impact"}
-          </Btn>
-        </div>
-      </Crd>
+    {/* Redeem */}
+    <Crd>
+      <Lbl>SE RACHETER</Lbl>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+        {RED.map(r=><button key={r.id} onClick={()=>redeem(r)} style={{background:s.debt>0?"rgba(16,185,129,0.07)":C.surface,border:`1px solid ${s.debt>0?C.emerald:C.border}`,borderRadius:10,padding:"11px 14px",cursor:"pointer",color:C.text,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
+          <span>{r.icon} {r.label}</span><span style={{color:C.emerald,fontWeight:800}}>-{r.r}</span>
+        </button>)}
+      </div>
+    </Crd>
 
-      {/* Today's activities */}
-      {todayActs.length>0&&<Crd>
-        <Lbl>ACTIVITÉS DU JOUR ({todayActs.length})</Lbl>
-        <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
-          {todayActs.map(a=>{
-            const hasImpact=Object.values(a.impacts).some(v=>v!==0);
-            const isEditing=editingId===a.id;
-            return<div key={a.id} style={{background:C.surface,borderRadius:12,padding:"10px 12px",border:`1px solid ${isEditing?C.sky:C.border}`}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:6}}>{a.text}{a.adjusted&&<span style={{fontSize:9,color:C.sky,marginLeft:6,fontWeight:700}}>AJUSTÉ</span>}</div>
-                  {!isEditing&&hasImpact&&<div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                    {Object.entries(a.impacts).filter(([,v])=>v!==0).map(([k,v])=><ImpactPill key={k} cat={k} val={v}/>)}
-                  </div>}
-                  {!isEditing&&!hasImpact&&<span style={{fontSize:11,color:C.sub}}>Aucun impact significatif détecté</span>}
-                  {!isEditing&&a.macros&&<div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:8,fontSize:10,color:C.sub}}>
-                    <span>🔥 {a.macros.kcal}kcal</span>
-                    <span>🥩 {a.macros.p}g prot</span>
-                    <span>🍚 {a.macros.c}g gluc</span>
-                    <span>🥑 {a.macros.f}g lip</span>
-                    {a.macros.su>0&&<span style={{color:a.macros.su>25?C.rose:C.sub}}>🍬 {a.macros.su}g sucre</span>}
-                  </div>}
-                </div>
-                {!isEditing&&<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
-                  <span style={{fontSize:10,color:C.sub}}>{a.time}</span>
-                  <button onClick={()=>removeActivity(a.id)} style={{background:"none",border:"none",color:C.sub,cursor:"pointer",fontSize:16,padding:0,lineHeight:1}}>×</button>
-                </div>}
-              </div>
-
-              {!isEditing&&<button onClick={()=>startEdit(a)} style={{marginTop:8,background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.sub,fontSize:11,cursor:"pointer",fontWeight:600}}>✏️ Ça ne me semble pas correct</button>}
-
-              {isEditing&&<div style={{marginTop:10,display:"flex",flexDirection:"column",gap:10,animation:"modalIn .3s cubic-bezier(.22,.61,.36,1)",transformOrigin:"top center"}}>
-                <div style={{fontSize:11,color:C.sub}}>Ajuste l'impact pour chaque catégorie (-20 à +20) :</div>
-                {Object.entries(CATS).map(([k,cat])=>(
-                  <div key={k}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                      <span style={{fontSize:12}}>{cat.icon} {cat.label}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:editVals[k]>0?C.emerald:editVals[k]<0?C.rose:C.sub}}>{editVals[k]>0?"+":""}{editVals[k]||0}</span>
-                    </div>
-                    <input type="range" min="-20" max="20" value={editVals[k]||0}
-                      onChange={e=>setEditVals(v=>({...v,[k]:parseInt(e.target.value)}))}
-                      style={{width:"100%",accentColor:cat.color}}/>
-                  </div>
-                ))}
-                <div style={{display:"flex",gap:8,marginTop:4}}>
-                  <Btn onClick={saveEdit} color={C.emerald} full>Enregistrer</Btn>
-                  <Btn onClick={resetToOriginal} color={C.muted} small>↺ Reset</Btn>
-                  <Btn onClick={cancelEdit} color={C.muted} small>Annuler</Btn>
-                </div>
-              </div>}
-            </div>;
-          })}
-        </div>
-      </Crd>}
-
-      {hasMacros&&<Crd>
-        <Lbl>🍽️ BILAN NUTRITIONNEL DU JOUR</Lbl>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,marginTop:10}}>
-          <span style={{fontSize:26,fontWeight:900,color:C.amber}}>{Math.round(macroTotals.kcal)}</span>
-          <span style={{fontSize:12,color:C.sub}}>/ {TARGETS.kcal} kcal</span>
-        </div>
-        <div style={{marginTop:6}}><Br val={macroTotals.kcal} max={TARGETS.kcal} color={C.amber}/></div>
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:14}}>
-          {[
-            {label:"Protéines",val:macroTotals.p,target:TARGETS.p,color:C.violet,icon:"🥩"},
-            {label:"Glucides",val:macroTotals.c,target:TARGETS.c,color:C.sky,icon:"🍚"},
-            {label:"Lipides",val:macroTotals.f,target:TARGETS.f,color:C.gold,icon:"🥑"},
-            {label:"Fibres",val:macroTotals.fi,target:TARGETS.fi,color:C.emerald,icon:"🌾"},
-          ].map(m=>(
-            <div key={m.label}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
-                <span>{m.icon} {m.label}</span>
-                <span style={{color:C.sub}}>{Math.round(m.val)}g / {m.target}g</span>
-              </div>
-              <Br val={m.val} max={m.target} color={m.color} h={5}/>
-            </div>
-          ))}
-          {macroTotals.su>0&&<div style={{marginTop:4,fontSize:11,color:macroTotals.su>50?C.rose:C.sub}}>
-            🍬 {Math.round(macroTotals.su)}g de sucre {macroTotals.su>50?"— au-dessus du plafond conseillé (50g)":""}
-          </div>}
-        </div>
-      </Crd>}
-
-      {todayActs.length===0&&<div style={{textAlign:"center",padding:"30px 20px",color:C.sub,fontSize:13}}>
-        <div style={{fontSize:32,marginBottom:8}}>⚡</div>
-        Aucune activité libre enregistrée aujourd'hui.<br/>Ajoute ce que tu as fait pour voir l'impact sur tes catégories.
-      </div>}
-    </>}
-
-    {section==="conscience"&&<>
-      {/* Debt meter */}
-      <Crd style={{border:`1px solid ${s.debt>0?C.red:C.emerald}40`}}>
-        <Lbl>DETTE ACTUELLE</Lbl>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10}}>
-          <div style={{fontSize:48,fontWeight:900,color:s.debt>0?C.rose:C.emerald,lineHeight:1,textShadow:s.debt>0?`0 0 20px ${C.red}`:undefined}}>{s.debt}</div>
-          <div style={{fontSize:13,color:s.debt>0?C.rose:C.emerald,fontWeight:600}}>{s.debt===0?"Conscience nette 🟢":s.debt===1?"Rachat requis":`${s.debt} rachats requis`}</div>
-        </div>
-        {s.debt>0&&<div style={{marginTop:10}}><Br val={Math.min(s.debt,5)} max={5} color={C.red}/></div>}
-      </Crd>
-
-      {/* Log fault */}
-      <Crd>
-        <Lbl>NOTER UNE FAUTE</Lbl>
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
-          {CF.map(f=><button key={f.id} onClick={()=>addFault(f)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"11px 14px",cursor:"pointer",color:C.text,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
-            <span>{f.label}</span><span style={{color:C.rose,fontWeight:800}}>+{f.debt}</span>
-          </button>)}
-        </div>
-      </Crd>
-
-      {/* Redeem */}
-      <Crd>
-        <Lbl>SE RACHETER</Lbl>
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
-          {RED.map(r=><button key={r.id} onClick={()=>redeem(r)} style={{background:s.debt>0?"rgba(16,185,129,0.07)":C.surface,border:`1px solid ${s.debt>0?C.emerald:C.border}`,borderRadius:10,padding:"11px 14px",cursor:"pointer",color:C.text,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}}>
-            <span>{r.icon} {r.label}</span><span style={{color:C.emerald,fontWeight:800}}>-{r.r}</span>
-          </button>)}
-        </div>
-      </Crd>
-
-      {/* Today's faults log */}
-      {todayFaults.length>0&&<Crd>
-        <Lbl>LOG DU JOUR</Lbl>
-        <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
-          {todayFaults.map((e,i)=><div key={i} style={{fontSize:12,color:C.sub,display:"flex",justifyContent:"space-between"}}>
-            <span>⚠️ {e.label}</span><span style={{color:C.rose}}>+{e.debt}</span>
-          </div>)}
-        </div>
-      </Crd>}
-    </>}
+    {/* Today's faults log */}
+    {todayFaults.length>0&&<Crd>
+      <Lbl>LOG DU JOUR</Lbl>
+      <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6}}>
+        {todayFaults.map((e,i)=><div key={i} style={{fontSize:12,color:C.sub,display:"flex",justifyContent:"space-between"}}>
+          <span>⚠️ {e.label}</span><span style={{color:C.rose}}>+{e.debt}</span>
+        </div>)}
+      </div>
+    </Crd>}
   </div>;
 }
+
 
 // ── SETTINGS ──
 function Settings({s,update,showT}){
   const fileInputRef=useRef(null);
-  const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},activities:[],activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
+  const rd=()=>{update(p=>({...p,coreProgress:{},bonusProgress:{},checklistProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
   const ra=()=>{update(()=>({...mkDef(),weeklyChallenge:generateWeeklyChallenge()}));showT("Données effacées",C.red);};
 
   const exportData=()=>{
@@ -890,7 +643,7 @@ function LevelUpOverlay({data,onClose}){
       <div style={{position:"absolute",width:170,height:170,background:`conic-gradient(from 45deg, transparent, ${rank.color}22, transparent)`,borderRadius:"50%",animation:"rotateSlowRev 8s linear infinite"}}/>
       <div style={{position:"absolute",width:150,height:150,borderRadius:"50%",background:`radial-gradient(circle, ${rank.color}30, transparent 70%)`,animation:"rayPulse 2s ease-in-out infinite"}}/>
       {/* Badge icon */}
-      <div style={{position:"relative",width:120,height:120,borderRadius:"50%",background:`linear-gradient(135deg, ${C.card2}, ${C.surface})`,border:`3px solid ${rank.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,boxShadow:`0 0 40px ${rank.color}88, inset 0 0 20px ${rank.color}33`,animation:closing?"none":"bounceIn .6s cubic-bezier(.34,1.56,.64,1)"}}>
+      <div style={{position:"relative",width:120,height:120,borderRadius:"50%",background:`linear-gradient(135deg, ${C.card}, ${C.surface})`,border:`3px solid ${rank.color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,boxShadow:`0 0 40px ${rank.color}88, inset 0 0 20px ${rank.color}33`,animation:closing?"none":"bounceIn .6s cubic-bezier(.34,1.56,.64,1)"}}>
         {rank.icon}
       </div>
     </div>
