@@ -2,10 +2,10 @@
 // APP.JS — Root component: state, persistence, and orchestration
 // Owns the single source of truth (s / setS), handles localStorage
 // load/save, day-rollover logic (badges, streaks, history snapshot,
-// category-base drift, weekly challenge), the level-up detector,
-// screen shake trigger, and renders the header + tab navigation +
-// active screen. This is the last file loaded and the only one
-// that calls ReactDOM.createRoot().
+// weekly challenge), the level-up detector, screen shake trigger,
+// and renders the header + tab navigation + active screen. This is
+// the last file loaded and the only one that calls
+// ReactDOM.createRoot().
 // Load order: data.js -> engine.js -> components.js -> screens.js -> app.js
 // ═══════════════════════════════════════════════════════
 
@@ -34,9 +34,9 @@ function App(){
         const p=JSON.parse(raw);
         if(p.todayKey!==TODAY()){
           const ok=isCoreOk(p);
-          const{gs:dayScore,cs:dayCats}=computeGlobalScore(p);
+          const{gs:dayScore}=computeGlobalScore(p);
           const hist=(p.history||[]).filter(h=>h.date!==p.todayKey);
-          hist.push({date:p.todayKey,score:dayScore,perfect:ok,cats:dayCats});
+          hist.push({date:p.todayKey,score:dayScore,perfect:ok});
           p.history=hist.slice(-90); // keep last 90 days max
           if(ok){p.perfectDays=(p.perfectDays||0)+1;p.currentStreak=(p.currentStreak||0)+1;const cs=p.currentStreak;if(cs%7===0)p.xp=(p.xp||0)+100;else if(cs%3===0)p.xp=(p.xp||0)+50;}
           else p.currentStreak=0;
@@ -73,17 +73,10 @@ function App(){
           p.coreProgress={};p.bonusProgress={};p.checklistProgress={};
           p.sleepBedtime=null;p.sleepWake=null;
           p.eveningDone=false;p.eveningNote={good:"",improve:""};
-          p.catBase=computeNextDayBase(dayCats);
-          p.screenUsage={};
-          p.activities=[];p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
           p.todayKey=TODAY();
           const nb=chkBadges(p);if(nb.length){p.unlockedBadges=[...(p.unlockedBadges||[]),...nb];p.newBadges=nb;}
         }
-        if(!p.activities)p.activities=[];
-        if(!p.activityImpacts)p.activityImpacts={corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0};
         if(!p.history)p.history=[];
-        if(!p.catBase)p.catBase={corps:50,nutrition:50,cerveau:50,apparence:50,discipline:50,social:50};
-        if(!p.screenUsage)p.screenUsage={};
         if(!p.records)p.records={bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0};
         if(!p.weeklyChallenge||p.weeklyChallenge.weekKey!==getWeekKey())p.weeklyChallenge=generateWeeklyChallenge();
         if(p.dailyXPGained===undefined)p.dailyXPGained=0;
@@ -136,7 +129,7 @@ function App(){
   if(!loaded||showSplash)return<SplashScreen fadingOut={splashFading}/>;
 
   const lvl=getLvl(s.xp),rank=getRank(lvl.lvl);
-  const{cs,gs}=computeGlobalScore(s);
+  const{gs}=computeGlobalScore(s);
   const cc=isCoreOk(s);
 
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,overflowX:"hidden",animation:shake?"screenShake .5s ease":"none",position:"relative"}}>
@@ -173,12 +166,12 @@ function App(){
 
     {/* Content */}
     <div key={tab} style={{padding:"14px 14px 90px",animation:"tabFade .35s cubic-bezier(.22,.61,.36,1)"}}>
-      {tab==="dashboard"&&<Dashboard s={s} cs={cs} gs={gs} lvl={lvl} rank={rank} update={update} showT={showT} cc={cc}/>}
+      {tab==="dashboard"&&<Dashboard s={s} gs={gs} lvl={lvl} rank={rank} update={update} showT={showT} cc={cc}/>}
       {tab==="habits"&&<Habits s={s} update={update} showT={showT} sp={sp}/>}
       {tab==="epic"&&<Epic s={s} update={update} showT={showT}/>}
-      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank} gs={gs} cs={cs}/>}
-      {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} gs={gs} update={update} showT={showT}/>}
-      {tab==="journal"&&<Journal s={s} update={update} showT={showT}/>}
+      {tab==="profile"&&<Profile s={s} lvl={lvl} rank={rank} gs={gs}/>}
+      {tab==="rewards"&&<Rewards s={s} lvl={lvl} cc={cc} update={update} showT={showT}/>}
+      {tab==="conscience"&&<Conscience s={s} update={update} showT={showT}/>}
       {tab==="settings"&&<Settings s={s} update={update} showT={showT}/>}
     </div>
 
@@ -189,7 +182,7 @@ function App(){
         <span style={{fontSize:8,fontWeight:700,letterSpacing:.3,textTransform:"uppercase"}}>{t.label}</span>
         {tab===t.id&&<div style={{position:"absolute",bottom:-6,width:20,height:2,background:C.violet,borderRadius:2}}/>}
         {t.id==="profile"&&s.newBadges?.length>0&&<div style={{position:"absolute",top:0,right:2,width:8,height:8,background:C.gold,borderRadius:"50%"}}/>}
-        {t.id==="journal"&&s.debt>0&&<div style={{position:"absolute",top:0,right:2,width:8,height:8,background:C.rose,borderRadius:"50%"}}/>}
+        {t.id==="conscience"&&s.debt>0&&<div style={{position:"absolute",top:0,right:2,width:8,height:8,background:C.rose,borderRadius:"50%"}}/>}
       </button>)}
     </nav>
     </div>
