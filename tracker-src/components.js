@@ -1,15 +1,15 @@
 // ═══════════════════════════════════════════════════════
 // COMPONENTS.JS — Shared, reusable UI building blocks
 // Card, progress bars (linear + segmented), labels, buttons, stat
-// tiles, animated CountUp numbers, circular Ring progress, category
-// impact pills. These have no knowledge of app state — pure
-// presentation components used throughout screens.js.
+// tiles, animated CountUp numbers, circular Ring progress. These
+// have no knowledge of app state — pure presentation components
+// used throughout screens.js.
 // Load order: data.js -> engine.js -> components.js -> screens.js -> app.js
 // ═══════════════════════════════════════════════════════
 const {useState,useEffect,useCallback,useRef}=React;
 
 const Crd=({children,style={},accent})=><div style={{
-  background:`linear-gradient(180deg, ${C.card2} 0%, ${C.card} 100%)`,
+  background:`linear-gradient(180deg, ${C.card} 0%, ${C.card} 100%)`,
   border:`1.5px solid ${accent?accent+"55":C.border}`,
   borderRadius:18,
   padding:16,
@@ -50,7 +50,7 @@ function CountUp({value,duration=700,decimals=0,suffix=""}){
     const to=value;
     if(from===to){setDisplay(to);return;}
     const start=performance.now();
-    const ease=t=>1-Math.pow(1-t,3); // ease-out cubic, smooth & premium
+    const ease=t=>1-Math.pow(1-t,3);
     const tick=now=>{
       const t=Math.min(1,(now-start)/duration);
       const eased=ease(t);
@@ -101,15 +101,3 @@ const Btn=({children,onClick,color,full,small})=>{
 const MStat=({icon,val,label,color})=><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:18}}>{icon}</div><div style={{fontSize:22,fontWeight:900,color,marginTop:2}}>{typeof val==="number"?<CountUp value={val}/>:val}</div><div style={{fontSize:10,color:C.sub,marginTop:1}}>{label}</div></div>;
 const iS={background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13};
 const tS={...iS,width:"100%",resize:"none",fontFamily:"inherit"};
-
-// ── IMPACT BADGE ──
-const ImpactPill=({cat,val})=>{
-  if(val===0)return null;
-  const positive=val>0;
-  const catInfo=CATS[cat];
-  return<div style={{display:"inline-flex",alignItems:"center",gap:4,background:positive?"rgba(16,185,129,0.12)":"rgba(244,63,94,0.12)",border:`1px solid ${positive?C.emerald:C.rose}40`,borderRadius:20,padding:"3px 8px",fontSize:11,fontWeight:700,color:positive?C.emerald:C.rose}}>
-    {catInfo?.icon} {positive?"+":""}{val}%
-  </div>;
-};
-
-// ── LOCAL ACTIVITY ANALYSIS (keyword + duration) ──
