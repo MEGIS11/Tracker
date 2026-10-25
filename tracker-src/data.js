@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════
 // DATA.JS — Constants and pure data structures
-// Colors, badges, ranks, habits, foods, XP tables, badge-check logic.
+// Colors, badges, ranks, habits, XP tables, badge-check logic.
 // No React here — safe to edit for rebalancing values (XP amounts,
-// badge thresholds, food macros, daily targets) without touching
-// any rendering or calculation logic.
+// badge thresholds) without touching any rendering logic.
 // Load order: data.js -> engine.js -> components.js -> screens.js -> app.js
 // ═══════════════════════════════════════════════════════
 
@@ -27,7 +26,7 @@ const fmtLocalDate=(d)=>{
 const TODAY=()=>fmtLocalDate(new Date());
 const getWeekKey=()=>{
   const d=new Date();
-  const day=d.getDay()===0?7:d.getDay(); // Monday=1..Sunday=7
+  const day=d.getDay()===0?7:d.getDay();
   const monday=new Date(d);
   monday.setDate(d.getDate()-(day-1));
   return fmtLocalDate(monday);
@@ -73,7 +72,6 @@ const BADGES=[
   {id:"b_pure14",icon:"👁️",name:"Âme Pure",desc:"14 jours sans aucune dette conscience",cat:"Légendaire",rarity:"legendary"},
   {id:"b_streak21",icon:"⚡",name:"Mode Berserk",desc:"21 jours de streak global",cat:"Légendaire",rarity:"legendary"},
   {id:"b_conscience7",icon:"🙏",name:"Conscience Nette",desc:"7 jours sans dette conscience",cat:"Légendaire",rarity:"epic"},
-  {id:"b_japan",icon:"🇯🇵",name:"Samouraï de l'Été",desc:"Tous les badges avant le départ au Japon",cat:"Légendaire",rarity:"legendary"},
 ];
 
 const RC={
@@ -122,11 +120,6 @@ const RD=[
   {id:"match",icon:"⚽",label:"Match / épisode tard le soir"},
   {id:"series",icon:"📺",label:"2 épisodes série bonus"},
 ];
-const SCREEN_APPS=[
-  {id:"snap",icon:"👻",label:"Snapchat",baseMin:5,maxMin:50,color:C.gold},
-  {id:"coc",icon:"⚔️",label:"Clash of Clans",baseMin:5,maxMin:40,color:C.violet},
-  {id:"insta",icon:"📸",label:"Instagram",baseMin:5,maxMin:30,color:C.fuchsia},
-];
 const RP=[
   {id:"p3",icon:"🎮",label:"Récompenses quotidiennes débloquées",lvl:3},
   {id:"p8",icon:"🇯🇵",label:"Budget Japon (Pokémon, mangas, figurines)",lvl:8},
@@ -152,7 +145,6 @@ const CATS={
   cerveau:{label:"Cerveau",icon:"🧠",color:C.sky},
   apparence:{label:"Apparence",icon:"✨",color:C.amber},
   discipline:{label:"Discipline",icon:"🎯",color:C.fuchsia},
-  social:{label:"Social",icon:"🤝",color:C.orange},
 };
 
 const TABS=[
@@ -161,7 +153,7 @@ const TABS=[
   {id:"epic",icon:"⚔️",label:"Épiques"},
   {id:"profile",icon:"🃏",label:"Profil"},
   {id:"rewards",icon:"🎁",label:"Récompenses"},
-  {id:"journal",icon:"👁️",label:"Journal"},
+  {id:"conscience",icon:"👁️",label:"Conscience"},
   {id:"settings",icon:"⚙️",label:"Réglages"},
 ];
 
@@ -182,8 +174,6 @@ const mkDef=()=>({
   sleepBedtime:null,sleepWake:null,
   epicProgress:{},epicQuests:EQ_DEF,
   debt:0,conscience:[],
-  activities:[],
-  activityImpacts:{corps:0,nutrition:0,cerveau:0,apparence:0,discipline:0,social:0},
   eveningDone:false,eveningNote:{good:"",improve:""},
   claimedPalier:[],unlockedBadges:[],newBadges:[],
   gymTotal:0,waterDays:0,onepieceTotal:0,proteinDays:0,veggieDays:0,
@@ -191,10 +181,8 @@ const mkDef=()=>({
   meditationStreak:0,readingStreak:0,tidyStreak:0,
   nocturneStreak:0,conscienceCleanStreak:0,proteinStreak:0,veggieStreak:0,
   history:[],
-  catBase:{corps:50,nutrition:50,cerveau:50,apparence:50,discipline:50,social:50},
-  screenUsage:{},
   records:{bestStreak:0,bestWeekAvg:0,bestDayXP:0,bestDayScore:0},
-  weeklyChallenge:null, // {weekKey, cat, habitId, goal, current, xpReward, done, claimed}
+  weeklyChallenge:null,
   dailyXPGained:0, dailyXPDate:null,
 });
 
@@ -204,7 +192,7 @@ const isCoreOk=s=>CORE.every(h=>{
   return(s.coreProgress?.[h.id]||0)>=h.goal;
 });
 
-const CAT_ORDER=["corps","nutrition","cerveau","apparence","discipline","social"];
+const CAT_ORDER=["corps","nutrition","cerveau","apparence","discipline"];
 
 const CHALLENGE_TEMPLATES={
   corps:[
@@ -245,19 +233,19 @@ function generateWeeklyChallenge(){
   };
 }
 
+// Global score = % of CORE habits completed today (no Journal dependency anymore)
 const computeGlobalScore=s=>{
-  const cs={};
-  const base=s.catBase||{};
-  Object.keys(CATS).forEach(cat=>{
-    const b=base[cat]!==undefined?base[cat]:50;
-    const impact=s.activityImpacts?.[cat]||0;
-    cs[cat]=Math.max(0,Math.min(100,Math.round(b+impact)));
-  });
-  const gs=Math.round(Object.values(cs).reduce((a,b)=>a+b,0)/Object.keys(CATS).length);
-  return{cs,gs};
+  const total=CORE.length;
+  const done=CORE.filter(h=>{
+    if(h.unit==="check")return Object.values(s.checklistProgress?.grooming||{}).filter(Boolean).length>=h.goal;
+    if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
+    return(s.coreProgress?.[h.id]||0)>=h.goal;
+  }).length;
+  const gs=total?Math.round((done/total)*100):0;
+  return{gs};
 };
 
-// Habits still track their own completion % for the Habitudes tab display (XP/streaks unaffected)
+// Habit completion % per category, for display in the Habitudes tab
 const computeHabitCompletion=s=>{
   const hc={};
   Object.keys(CATS).forEach(cat=>{
@@ -272,16 +260,6 @@ const computeHabitCompletion=s=>{
     hc[cat]=Math.round(tot/all.length);
   });
   return hc;
-};
-
-// Compute tomorrow's morning starting base per category: drift halfway toward 50 from today's end-of-day score
-const computeNextDayBase=(cs)=>{
-  const next={};
-  Object.keys(CATS).forEach(cat=>{
-    const today=cs[cat]??50;
-    next[cat]=Math.round(today+(50-today)*0.4); // 40% drift toward neutral 50
-  });
-  return next;
 };
 
 const chkBadges=s=>{
@@ -305,9 +283,5 @@ const chkBadges=s=>{
   c("b_perfect7",(s.currentStreak||0)>=7);c("b_perfect30",(s.perfectDays||0)>=30);
   c("b_pure14",(s.conscienceCleanStreak||0)>=14);c("b_streak21",(s.currentStreak||0)>=21);
   c("b_conscience7",(s.conscienceCleanStreak||0)>=7);
-  const ae=BADGES.filter(b=>b.id!=="b_japan").every(b=>(s.unlockedBadges||[]).includes(b.id));
-  c("b_japan",ae);
   return r;
 };
-
-
