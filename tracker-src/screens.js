@@ -143,7 +143,7 @@ function Habits({s,update,showT}){
     return nb;
   });
 
-  return<div style={{display:"flex",flexDirection:"column",gap:12}}>
+  return<div className="zen-grid-2col">
     {CORE.map((h)=>{
       if(h.id==="sleep"){
         const sh=calcSleep(s.sleepBedtime,s.sleepWake),done=sh>=SG;
@@ -171,6 +171,7 @@ function Habits({s,update,showT}){
     })}
   </div>;
 }
+
 
 // ── EPIC ──
 function Epic({s,update,showT}){
