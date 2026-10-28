@@ -46,63 +46,66 @@ function Dashboard({s,gs,lvl,rank,update,showT,cc}){
   }).length;
   const hc=computeHabitCompletion(s);
 
-  return<div style={{display:"flex",flexDirection:"column",gap:16}}>
-    {s.weeklyChallenge&&<WeeklyChallengeCard wc={s.weeklyChallenge} update={update} showT={showT}/>}
+  return<div className="zen-grid-2col">
+    {/* Colonne Pleine Largeur : Défi de la semaine */}
+    {s.weeklyChallenge&&<div className="zen-full-width"><WeeklyChallengeCard wc={s.weeklyChallenge} update={update} showT={showT}/></div>}
 
-    {/* Countdown Japan */}
-    <div style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:20,padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <div><div style={{fontSize:11,color:C.sub,letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Prochain voyage · Japon</div><div style={{fontSize:13,color:C.text,marginTop:2,fontWeight:600}}>11 juillet 2026</div></div>
-      <div style={{textAlign:"right"}}><div style={{fontSize:32,fontWeight:900,color:C.roseDeep,lineHeight:1}}>{dtj}</div><div style={{fontSize:11,color:C.sub}}>jours restants</div></div>
+    {/* Colonne Gauche : Score & Décompte Japon */}
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <Crd>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
+          <div><Lbl>SÉRÉNITÉ DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:getScoreColor(gs),lineHeight:1.1,marginTop:4}}><CountUp value={gs} suffix="%"/></div></div>
+          <div style={{textAlign:"right"}}>{cc&&<div style={{color:C.green,fontWeight:700,fontSize:12}}>🌸 Journée accomplie</div>}<div style={{fontSize:11,color:C.sub,marginTop:4}}>{cnt}/{CORE.length} rituels</div></div>
+        </div>
+        <Br val={gs} max={100} color={getScoreColor(gs)} glow/>
+      </Crd>
+
+      <div style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:20,padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><div style={{fontSize:11,color:C.sub,letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Prochain voyage · Japon</div><div style={{fontSize:13,color:C.text,marginTop:2,fontWeight:600}}>11 juillet 2026</div></div>
+        <div style={{textAlign:"right"}}><div style={{fontSize:32,fontWeight:900,color:C.roseDeep,lineHeight:1}}>{dtj}</div><div style={{fontSize:11,color:C.sub}}>jours restants</div></div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+        <MStat icon="🔥" val={s.currentStreak} label="Série" color={C.amber}/>
+        <MStat icon="🌸" val={s.perfectDays} label="Parfaits" color={C.rose}/>
+        <MStat icon="🪷" val={s.nofapStreak||0} label="Maîtrise" color={C.green}/>
+      </div>
     </div>
 
-    {/* Score du jour */}
-    <Crd>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
-        <div><Lbl>SÉRÉNITÉ DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:getScoreColor(gs),lineHeight:1.1,marginTop:4}}><CountUp value={gs} suffix="%"/></div></div>
-        <div style={{textAlign:"right"}}>{cc&&<div style={{color:C.green,fontWeight:700,fontSize:12}}>🌸 Journée accomplie</div>}<div style={{fontSize:11,color:C.sub,marginTop:4}}>{cnt}/{CORE.length} rituels</div></div>
-      </div>
-      <Br val={gs} max={100} color={getScoreColor(gs)} glow/>
-    </Crd>
+    {/* Colonne Droite : Équilibre des domaines & Réflexion du soir */}
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <Crd>
+        <Lbl>ÉQUILIBRE DES DOMAINES</Lbl>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
+          {Object.entries(CATS).map(([k,cat])=>{
+            const val=hc[k]||0;
+            const color=getScoreColor(val);
+            return<div key={k}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6,fontWeight:600}}>
+                <span>{cat.icon} {cat.label}</span>
+                <span style={{color}}><CountUp value={val} suffix="%"/></span>
+              </div>
+              <Br val={val} max={100} color={color} h={6}/>
+            </div>;
+          })}
+        </div>
+      </Crd>
 
-    {/* Par catégorie */}
-    <Crd>
-      <Lbl>ÉQUILIBRE DES DOMAINES</Lbl>
-      <div style={{display:"flex",flexDirection:"column",gap:12,marginTop:12}}>
-        {Object.entries(CATS).map(([k,cat])=>{
-          const val=hc[k]||0;
-          const color=getScoreColor(val);
-          return<div key={k}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6,fontWeight:600}}>
-              <span>{cat.icon} {cat.label}</span>
-              <span style={{color}}><CountUp value={val} suffix="%"/></span>
-            </div>
-            <Br val={val} max={100} color={color} h={6}/>
-          </div>;
-        })}
-      </div>
-    </Crd>
-
-    {/* Stats rapides */}
-    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-      <MStat icon="🔥" val={s.currentStreak} label="Série" color={C.amber}/>
-      <MStat icon="🌸" val={s.perfectDays} label="Parfaits" color={C.rose}/>
-      <MStat icon="🪷" val={s.nofapStreak||0} label="Maîtrise" color={C.green}/>
+      <Crd style={{border:`1.5px solid ${s.eveningDone?C.green:C.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><Lbl>RÉFLEXION DU SOIR</Lbl><div style={{fontSize:11,color:C.sub,marginTop:3}}>Apaiser l'esprit avant la nuit</div></div>
+          {s.eveningDone?<span style={{color:C.green,fontWeight:700,fontSize:13}}>✓ Fait</span>:<Btn onClick={()=>setEo(!eo)} color={C.rose} small>Écrire</Btn>}
+        </div>
+        {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
+          <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🌸 Un moment positif aujourd'hui</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ex: calme, respiration..."/></div>
+          <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🍃 Une intention pour demain</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Ex: moins de téléphone..."/></div>
+          <Btn onClick={save} color={C.green} full>Enregistrer</Btn>
+        </div>}
+      </Crd>
     </div>
-
-    {/* Bilan du soir */}
-    <Crd style={{border:`1.5px solid ${s.eveningDone?C.green:C.border}`}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div><Lbl>RÉFLEXION DU SOIR</Lbl><div style={{fontSize:11,color:C.sub,marginTop:3}}>Apaiser l'esprit avant la nuit</div></div>
-        {s.eveningDone?<span style={{color:C.green,fontWeight:700,fontSize:13}}>✓ Fait</span>:<Btn onClick={()=>setEo(!eo)} color={C.rose} small>Écrire</Btn>}
-      </div>
-      {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
-        <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🌸 Un moment positif aujourd'hui</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ex: calme, respiration..."/></div>
-        <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🍃 Une intention pour demain</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Ex: moins de téléphone..."/></div>
-        <Btn onClick={save} color={C.green} full>Enregistrer</Btn>
-      </div>}
-    </Crd>
   </div>;
 }
+
 
 // ── HABITS ──
 function Habits({s,update,showT}){
