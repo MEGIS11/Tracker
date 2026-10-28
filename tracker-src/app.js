@@ -66,7 +66,8 @@ function App(){
   const{gs}=computeGlobalScore(s);
   const cc=isCoreOk(s);
 
-  return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,position:"relative",width:"100%",maxWidth:640,margin:"0 auto",boxShadow:"0 0 40px rgba(0,0,0,0.03)"}}>
+  return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,position:"relative",width:"100%",maxWidth:880,margin:"0 auto",boxShadow:"0 0 40px rgba(0,0,0,0.03)"}}>
+
 
     {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#fff",fontWeight:700,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 30px ${toast.color}44`,whiteSpace:"nowrap"}}>{toast.msg}</div>}
 
@@ -99,7 +100,8 @@ function App(){
     </div>
 
     {/* Nav Bar Zen */}
-    <nav style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:640,background:`${C.card}f5`,backdropFilter:"blur(12px)",borderTop:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-around",padding:"8px 4px 20px",zIndex:100}}>
+    <nav style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:880,background:`${C.card}f5`,backdropFilter:"blur(12px)",borderTop:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-around",padding:"10px 12px 22px",zIndex:100}}>
+
 
       {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"none",border:"none",cursor:"pointer",padding:"6px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:tab===t.id?C.roseDeep:C.sub,transition:"all .2s"}}>
         <span style={{fontSize:16}}>{t.icon}</span>
