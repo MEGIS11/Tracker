@@ -67,11 +67,8 @@ function App(){
   const cc=isCoreOk(s);
 
   return<div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Inter',system-ui,sans-serif",color:C.text,position:"relative",width:"100%",maxWidth:880,margin:"0 auto",boxShadow:"0 0 40px rgba(0,0,0,0.03)"}}>
-
-
     {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:toast.color,color:"#fff",fontWeight:700,padding:"10px 24px",borderRadius:30,zIndex:9999,fontSize:13,boxShadow:`0 8px 30px ${toast.color}44`,whiteSpace:"nowrap"}}>{toast.msg}</div>}
 
-    {/* Header Zen */}
     <div style={{background:C.card,borderBottom:`1.5px solid ${C.border}`,padding:"16px 20px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
@@ -88,7 +85,6 @@ function App(){
       </div>
     </div>
 
-    {/* Content */}
     <div key={tab} style={{padding:"16px 16px 100px"}}>
       {tab==="dashboard"&&<Dashboard s={s} gs={gs} lvl={lvl} rank={rank} update={update} showT={showT} cc={cc}/>}
       {tab==="habits"&&<Habits s={s} update={update} showT={showT}/>}
@@ -99,10 +95,7 @@ function App(){
       {tab==="settings"&&<Settings s={s} update={update} showT={showT}/>}
     </div>
 
-    {/* Nav Bar Zen */}
     <nav style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:880,background:`${C.card}f5`,backdropFilter:"blur(12px)",borderTop:`1.5px solid ${C.border}`,display:"flex",justifyContent:"space-around",padding:"10px 12px 22px",zIndex:100}}>
-
-
       {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:"none",border:"none",cursor:"pointer",padding:"6px 4px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:tab===t.id?C.roseDeep:C.sub,transition:"all .2s"}}>
         <span style={{fontSize:16}}>{t.icon}</span>
         <span style={{fontSize:9,fontWeight:700,letterSpacing:.3,textTransform:"uppercase"}}>{t.label}</span>
@@ -111,7 +104,6 @@ function App(){
   </div>;
 }
 
-// ── SPLASH SCREEN AVEC LE LOTUS ROSE ──
 function SplashScreen({fadingOut}){
   return<div style={{
     position:"fixed",inset:0,zIndex:20000,
@@ -120,7 +112,6 @@ function SplashScreen({fadingOut}){
     animation:fadingOut?"splashOut .5s ease forwards":"none",
   }}>
     <div style={{position:"relative",width:120,height:120,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      {/* Animation d'ouverture du Lotus */}
       <div style={{
         fontSize:64,
         animation:"lotusBloom 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) both",
