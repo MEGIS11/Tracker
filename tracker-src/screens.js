@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// SCREENS.JS — Tabs, Mastery / No-Fap Tracker, Zen UI
+// SCREENS.JS — Tabs, Views, Mastery & Zen Dashboard
 // ═══════════════════════════════════════════════════════
 
 function WeeklyChallengeCard({wc,update,showT}){
@@ -34,12 +34,11 @@ function WeeklyChallengeCard({wc,update,showT}){
   </div>;
 }
 
+// ── DASHBOARD (Accueil sans la bannière Japon) ──
 function Dashboard({s,gs,lvl,rank,update,showT,cc}){
   const[eo,setEo]=useState(false);
   const[good,setGood]=useState(s.eveningNote?.good||"");
   const[imp,setImp]=useState(s.eveningNote?.improve||"");
-  const dtj=Math.max(0,Math.ceil((new Date("2026-07-11")-new Date())/86400000));
-  const save=()=>{update(p=>({...p,eveningDone:true,eveningNote:{good,improve:imp}}));showT("Bilan enregistré ✓",C.green);setEo(false);};
   const cnt=CORE.filter(h=>{
     if(h.id==="sleep")return calcSleep(s.sleepBedtime,s.sleepWake)>=SG;
     return(s.coreProgress?.[h.id]||0)>=h.goal;
@@ -47,23 +46,16 @@ function Dashboard({s,gs,lvl,rank,update,showT,cc}){
   const hc=computeHabitCompletion(s);
 
   return<div className="zen-grid-2col">
-    {/* Colonne Pleine Largeur : Défi de la semaine */}
     {s.weeklyChallenge&&<div className="zen-full-width"><WeeklyChallengeCard wc={s.weeklyChallenge} update={update} showT={showT}/></div>}
 
-    {/* Colonne Gauche : Score & Décompte Japon */}
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <Crd>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
-          <div><Lbl>SÉRÉNITÉ DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:getScoreColor(gs),lineHeight:1.1,marginTop:4}}><CountUp value={gs} suffix="%"/></div></div>
+          <div><Lbl>SCORE DU JOUR</Lbl><div style={{fontSize:44,fontWeight:900,color:getScoreColor(gs),lineHeight:1.1,marginTop:4}}><CountUp value={gs} suffix="%"/></div></div>
           <div style={{textAlign:"right"}}>{cc&&<div style={{color:C.green,fontWeight:700,fontSize:12}}>🌸 Journée accomplie</div>}<div style={{fontSize:11,color:C.sub,marginTop:4}}>{cnt}/{CORE.length} rituels</div></div>
         </div>
         <Br val={gs} max={100} color={getScoreColor(gs)} glow/>
       </Crd>
-
-      <div style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:20,padding:"16px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div><div style={{fontSize:11,color:C.sub,letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Prochain voyage · Japon</div><div style={{fontSize:13,color:C.text,marginTop:2,fontWeight:600}}>11 juillet 2026</div></div>
-        <div style={{textAlign:"right"}}><div style={{fontSize:32,fontWeight:900,color:C.roseDeep,lineHeight:1}}>{dtj}</div><div style={{fontSize:11,color:C.sub}}>jours restants</div></div>
-      </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         <MStat icon="🔥" val={s.currentStreak} label="Série" color={C.amber}/>
@@ -72,7 +64,6 @@ function Dashboard({s,gs,lvl,rank,update,showT,cc}){
       </div>
     </div>
 
-    {/* Colonne Droite : Équilibre des domaines & Réflexion du soir */}
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <Crd>
         <Lbl>ÉQUILIBRE DES DOMAINES</Lbl>
@@ -93,12 +84,12 @@ function Dashboard({s,gs,lvl,rank,update,showT,cc}){
 
       <Crd style={{border:`1.5px solid ${s.eveningDone?C.green:C.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div><Lbl>RÉFLEXION DU SOIR</Lbl><div style={{fontSize:11,color:C.sub,marginTop:3}}>Apaiser l'esprit avant la nuit</div></div>
+          <div><Lbl>BILAN DU SOIR</Lbl><div style={{fontSize:11,color:C.sub,marginTop:3}}>Notes et bilan de la journée</div></div>
           {s.eveningDone?<span style={{color:C.green,fontWeight:700,fontSize:13}}>✓ Fait</span>:<Btn onClick={()=>setEo(!eo)} color={C.rose} small>Écrire</Btn>}
         </div>
         {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
-          <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🌸 Un moment positif aujourd'hui</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ex: calme, respiration..."/></div>
-          <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>🍃 Une intention pour demain</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Ex: moins de téléphone..."/></div>
+          <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>Point positif</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ce qui s'est bien passé..."/></div>
+          <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>À améliorer</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Pour demain..."/></div>
           <Btn onClick={save} color={C.green} full>Enregistrer</Btn>
         </div>}
       </Crd>
@@ -106,9 +97,17 @@ function Dashboard({s,gs,lvl,rank,update,showT,cc}){
   </div>;
 }
 
-
-// ── HABITS ──
+// ── HABITS (Avec boutons d'annulation / - pour éviter les missclicks) ──
 function Habits({s,update,showT}){
+  const modifyP=(id,delta)=>{
+    update(p=>{
+      const h=CORE.find(x=>x.id===id);if(!h)return p;
+      const cur=p.coreProgress?.[id]||0;
+      const nxt=Math.max(0, cur+delta);
+      return{...p,coreProgress:{...p.coreProgress,[id]:nxt}};
+    });
+  };
+
   const addP=(id,amt)=>{
     update(p=>{
       const h=CORE.find(x=>x.id===id);if(!h)return p;
@@ -135,12 +134,7 @@ function Habits({s,update,showT}){
   };
 
   const setSl=(f,v)=>update(p=>{
-    const nb={...p,[f]:v};const sh=calcSleep(nb.sleepBedtime,nb.sleepWake);
-    if(sh>=SG&&calcSleep(p.sleepBedtime,p.sleepWake)<SG){
-      setTimeout(()=>showT("😴 Sommeil réparateur validé ! +35XP",C.purple),10);
-      return{...nb,xp:p.xp+35};
-    }
-    return nb;
+    const nb={...p,[f]:v};return nb;
   });
 
   return<div className="zen-grid-2col">
@@ -162,18 +156,20 @@ function Habits({s,update,showT}){
       return<Crd key={h.id} style={{borderLeft:`4px solid ${done?C.green:h.color}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:22}}>{h.icon}</span><div><div style={{fontWeight:700,fontSize:14}}>{h.label}</div><div style={{fontSize:11,color:C.sub}}>{h.xp} XP</div></div></div>
-          <div style={{fontWeight:800,fontSize:16,color:done?C.green:C.text}}>{h.unit==="bool"?(done?"✓":"—"):`${cur}${h.unit}`}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {cur>0&&<button onClick={()=>modifyP(h.id, -h.step)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,width:24,height:24,cursor:"pointer",color:C.sub,fontWeight:700}}>-</button>}
+            <div style={{fontWeight:800,fontSize:16,color:done?C.green:C.text}}>{h.unit==="bool"?(done?"✓":"—"):`${cur}${h.unit}`}</div>
+          </div>
         </div>
         {h.unit!=="bool"&&<div style={{marginTop:10}}><Br val={cur} max={h.goal} color={done?C.green:h.color} glow={done}/></div>}
         {!done&&<div style={{marginTop:12}}><Btn onClick={()=>addP(h.id,h.step)} color={h.color} full>+{h.step}{h.unit==="bool"?" Valider":h.unit}</Btn></div>}
-        {done&&<div style={{marginTop:10,color:C.green,fontWeight:700,fontSize:12}}>✓ Accomplis pour aujourd'hui</div>}
+        {done&&<div style={{marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{color:C.green,fontWeight:700,fontSize:12}}>✓ Accomplis</span><button onClick={()=>modifyP(h.id, -h.step)} style={{background:"none",border:"none",color:C.sub,fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Annuler</button></div>}
       </Crd>;
     })}
   </div>;
 }
 
-
-// ── EPIC ──
+// ── EPIC (Quêtes à long terme) ──
 function Epic({s,update,showT}){
   const setM=(qid,idx)=>update(p=>{
     const q=p.epicQuests.find(x=>x.id===qid);if(!q||(p.epicProgress?.[qid]||0)>idx)return p;
@@ -205,8 +201,10 @@ function Epic({s,update,showT}){
   </div>;
 }
 
-// ── PROFILE ──
+// ── PROFIL (Avec Badges & Courbes d'évolution) ──
 function Profile({s,lvl,rank}){
+  const history=s.history||[];
+  
   return<div style={{display:"flex",flexDirection:"column",gap:16}}>
     <div style={{background:`linear-gradient(135deg, ${C.surface}, ${C.card})`,border:`1.5px solid ${C.border}`,borderRadius:24,padding:20,boxShadow:"0 6px 24px rgba(224,82,127,0.06)"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -215,35 +213,71 @@ function Profile({s,lvl,rank}){
           <div style={{fontSize:26,fontWeight:900,color:C.text,marginTop:4}}>Niveau {lvl.lvl}</div>
           <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}><span style={{fontSize:18}}>{rank.icon}</span><span style={{fontSize:13,fontWeight:700,color:rank.color}}>{rank.name}</span></div>
         </div>
-        <div style={{textAlign:"right"}}><div style={{fontSize:22,fontWeight:900,color:C.roseDeep}}><CountUp value={s.xp}/></div><div style={{fontSize:10,color:C.sub}}>XP total</div></div>
+        <div style={{textAlign:"right"}}><div style={{fontSize:22,fontWeight:900,color:C.roseDeep}><CountUp value={s.xp}/></div><div style={{fontSize:10,color:C.sub}}>XP total</div></div>
       </div>
       <div style={{marginTop:16}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub,marginBottom:4}}><span>Progression</span><span>{Math.round(lvl.rem)}/{lvl.needed} XP</span></div>
         <SegBar pct={lvl.pct} color={C.rose} segments={20} h={8}/>
       </div>
     </div>
-  </div>;
-}
 
-// ── REWARDS / PLAISIRS ──
-function Rewards({s,lvl,cc}){
-  const du=lvl.lvl>=2&&cc;
-  return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    {/* Courbe / Historique des scores récents */}
     <Crd>
-      <Lbl>PLAISIRS SAINS & DOUX</Lbl>
-      <div style={{fontSize:12,color:du?C.green:C.rose,marginTop:6,marginBottom:12,fontWeight:600}}>
-        {du?"✅ Bien mérités — profites-en pleinement !":!cc?"Accomplis tes rituels du jour d'abord":"Niveau 2 requis"}
+      <Lbl>📈 ÉVOLUTION DE LA SÉRÉNITÉ (90 DERNIERS JOURS)</Lbl>
+      {history.length===0?<div style={{fontSize:12,color:C.sub,marginTop:10}}>Pas encore assez d'historique. Continue tes journées pour voir la courbe se dessiner !</div>:
+      <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",alignItems:"flex-end",height:100,gap:4,borderBottom:`1px solid ${C.border}`,paddingBottom:4}}>
+          {history.map((h,i)=>{
+            const sc=h.score||0;
+            return<div key={i} title={`${h.date}: ${sc}%`} style={{flex:1,background:getScoreColor(sc),height:`${Math.max(4,sc)}%`,borderRadius:4,transition:"height .3s"}}/>;
+          })}
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub}}>
+          <span>{history[0]?.date}</span>
+          <span>Aujourd'hui</span>
+        </div>
+      </div>}
+    </Crd>
+
+    {/* Section Badges */}
+    <Crd>
+      <Lbl>🏆 BADGES DÉBLOQUÉS</Lbl>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginTop:12}}>
+        {BADGES.map(b=>{
+          const unlocked=(s.unlockedBadges||[]).includes(b.id);
+          return<div key={b.id} style={{background:unlocked?C.surface:C.card,border:`1.5px solid ${unlocked?C.border:C.muted}`,borderRadius:14,padding:12,opacity:unlocked?1:0.4}}>
+            <div style={{fontSize:24}}>{b.icon}</div>
+            <div style={{fontSize:13,fontWeight:700,marginTop:6,color:unlocked?C.text:C.sub}}>{b.name}</div>
+            <div style={{fontSize:11,color:C.sub,marginTop:2}}>{b.desc}</div>
+          </div>;
+        })}
       </div>
-      {RD.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${C.border}`,opacity:du?1:0.4}}>
-        <span style={{fontSize:24}}>{r.icon}</span>
-        <span style={{fontSize:14,fontWeight:500}}>{r.label}</span>
-        {du&&<span style={{marginLeft:"auto",color:C.green,fontSize:12,fontWeight:700}}>Disponible 🔓</span>}
-      </div>)}
     </Crd>
   </div>;
 }
 
-// ── CONSCIENCE & MAÎTRISE DE SOI (No-Fap & Titres Mystères) ──
+// ── REWARDS (Plaisirs réels) ──
+function Rewards({s,lvl,cc}){
+  return<div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <Crd>
+      <Lbl>RÉCOMPENSES & PLAISIRS</Lbl>
+      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:12}}>Débloque et profite de tes récompenses bien méritées.</div>
+      {RD.map(r=>{
+        const ok=lvl.lvl>=(r.lvl||1);
+        return<div key={r.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${C.border}`,opacity:ok?1:0.5}}>
+          <span style={{fontSize:24}}>{r.icon}</span>
+          <div>
+            <div style={{fontSize:14,fontWeight:600}}>{r.label}</div>
+            <div style={{fontSize:11,color:C.sub}}>{r.lvl?`Niveau ${r.lvl} requis`:"Disponible"}</div>
+          </div>
+          {ok&&<span style={{marginLeft:"auto",color:C.green,fontSize:12,fontWeight:700}}>Débloqué ✓</span>}
+        </div>;
+      })}
+    </Crd>
+  </div>;
+}
+
+// ── CONSCIENCE & MAÎTRISE DE SOI ──
 function Conscience({s,update,showT}){
   const streak=s.nofapStreak||0;
   const best=s.nofapBest||0;
@@ -262,7 +296,6 @@ function Conscience({s,update,showT}){
     let addedXp=0;
     const newUnlocked=[...(p.unlockedMastery||[0])];
 
-    // Vérifier les paliers mystères
     MASTERY_MILESTONES.forEach((m,idx)=>{
       if(next>=m.days&&!newUnlocked.includes(idx+1)){
         newUnlocked.push(idx+1);
@@ -275,7 +308,6 @@ function Conscience({s,update,showT}){
   });
 
   return<div style={{display:"flex",flexDirection:"column",gap:16}}>
-    {/* Compteur Maîtrise de soi */}
     <Crd style={{background:`linear-gradient(135deg, ${C.surface}, ${C.card})`,border:`1.5px solid ${C.rosePale}`}}>
       <Lbl>🪷 MAÎTRISE DE SOI & CLARTÉ</Lbl>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14}}>
@@ -290,7 +322,6 @@ function Conscience({s,update,showT}){
       </div>
     </Crd>
 
-    {/* Paliers & Titres Mystères Cachés */}
     <Crd>
       <Lbl>✨ TITRES & PALIERS MYSTÈRES</Lbl>
       <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:14}}>Continue ton chemin pour révéler les secrets de la maîtrise.</div>
