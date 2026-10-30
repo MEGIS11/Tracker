@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════
-// COMPONENTS.JS — Shared, reusable UI building blocks (Zen & Pastel)
+// COMPONENTS.JS — Shared UI building blocks
 // ═══════════════════════════════════════════════════════
 const {useState,useEffect,useCallback,useRef}=React;
 
