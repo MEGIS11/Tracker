@@ -1,29 +1,28 @@
 // ═══════════════════════════════════════════════════════
-// DATA.JS — Constants, pastel palette, badges, ranks, new goals
+// DATA.JS — Constants, pastel palette, badges, ranks, goals
 // ═══════════════════════════════════════════════════════
 
 const C={
-  bg:"#fffdfa",          // Blanc cassé très doux / zen
-  surface:"#f5edea",     // Rose poudré pastel très clair
-  card:"#ffffff",        // Blanc pur pour les cartes
-  border:"#f2d6df",      // Bordure rose poudré délicat
+  bg:"#fffdfa",
+  surface:"#f5edea",
+  card:"#ffffff",
+  border:"#f2d6df",
   muted:"#e0cbd4",
   dim:"#faeef2",
-  text:"#2d2328",        // Texte sombre chaleureux (pas de noir pur)
-  sub:"#8c7982",         // Texte secondaire doux
+  text:"#2d2328",
+  sub:"#8c7982",
   
-  // Palette pastel harmonieuse
   rose:"#ff7b9f",
   rosePale:"#ffe0ea",
   roseDeep:"#e0527f",
-  green:"#5bba8f",       // Vert sauge pastel
+  green:"#5bba8f",
   emerald:"#73d2a0",
   emeraldPale:"#e2f6ed",
-  blue:"#64b5f6",        // Bleu ciel poudré
+  blue:"#64b5f6",
   skyPale:"#e3f2fd",
-  amber:"#ffb74d",       // Pêche / Or doux
+  amber:"#ffb74d",
   goldPale:"#fff8e1",
-  purple:"#b39ddb",      // Lavande douce
+  purple:"#b39ddb",
   lavender:"#ede7f6",
 };
 
@@ -54,7 +53,6 @@ const RANKS=[
 ];
 const getRank=l=>RANKS.find(r=>l>=r.min&&l<=r.max)||RANKS[0];
 
-// Paliers secrets pour la maîtrise de soi (No-Fap)
 const MASTERY_MILESTONES=[
   { days: 3, title: "L'Étincelle de Volonté", desc: "Les premiers jours de clarté mentale.", xp: 100 },
   { days: 7, title: "Le Gardien du Seuil", desc: "Une première semaine complète de maîtrise.", xp: 250 },
@@ -78,17 +76,9 @@ const BADGES=[
   {id:"b_mastery30",icon:"🪷",name:"Souveraineté",desc:"Atteindre 30 jours de maîtrise de soi",cat:"Maîtrise",rarity:"legendary"},
 ];
 
-const RC={
-  common:{bg:"#f5edea",border:"#e0cbd4",text:"#8c7982",glow:"none"},
-  rare:{bg:"#e3f2fd",border:"#90caf9",text:"#1e88e5",glow:"0 0 10px rgba(100,181,246,0.3)"},
-  epic:{bg:"#ede7f6",border:"#b39ddb",text:"#7e57c2",glow:"0 0 14px rgba(179,157,219,0.4)"},
-  legendary:{bg:"#fff8e1",border:"#ffb74d",text:"#f57c00",glow:"0 0 18px rgba(255,183,77,0.5)"},
-};
-
 const XPT=Array.from({length:100},(_,i)=>Math.floor(120*Math.pow(1.38,i)));
 const getLvl=xp=>{let l=1,r=xp;for(let i=0;i<XPT.length;i++){if(r>=XPT[i]){r-=XPT[i];l=i+2;}else break;}const n=XPT[l-1]||99999;return{lvl:l,rem:r,needed:n,pct:(r/n)*100};};
 
-// NOUVELLES HABITUDES CORE (Mis à jour selon tes souhaits : fin du cuisine/dessin, ajout respiration, détox, lumière du matin, chambre organisée)
 const CORE=[
   {id:"water",cat:"corps",icon:"💧",label:"Hydratation",unit:"ml",goal:2000,step:200,xp:25,color:C.blue},
   {id:"gym",cat:"corps",icon:"🏋️",label:"Séance Gym",unit:"min",goal:60,step:15,xp:50,color:C.purple},
@@ -102,32 +92,27 @@ const CORE=[
   {id:"stretching",cat:"corps",icon:"🧘",label:"Étirements",unit:"min",goal:10,step:5,xp:20,color:C.green},
 ];
 
-const BONUS=[]; // Plus de bonus complexes (dessin / cuisine retirés)
+const BONUS=[];
 
+// Vrais objectifs épiques à long terme
 const EQ_DEF=[
   {id:"backflip",icon:"🤸",label:"Apprendre le backflip",xp:500,milestones:["Headstand 10s","Backbend fluide","Backflip assisté","Backflip solo !"]},
   {id:"nihongo",icon:"🎌",label:"Maîtriser 100 mots japonais",xp:400,milestones:["25 mots","50 mots","75 mots","100 mots"]},
   {id:"pullups",icon:"💪",label:"Atteindre 15 tractions strictes",xp:450,milestones:["5 tractions","8 tractions","10 tractions","12 tractions","15 tractions !"]},
+  {id:"project",icon:"💻",label:"Développer un projet personnel de A à Z",xp:600,milestones:["Idée & Cadrage","Architecture","MVP fonctionnel","Lancement"]},
 ];
 
+// Vrais plaisirs / récompenses concrètes
 const RD=[
-  {id:"tea",icon:"🍵",label:"Boisson ou thé de qualité en pleine conscience"},
-  {id:"relax",icon:"🌿",label:"Moment de détente calme sans culpabilité"},
+  {id:"movie",icon:"🍿",label:"Se faire une soirée film / série sans culpabilité"},
+  {id:"gaming",icon:"🎮",label:"Session de jeux vidéo de 2h",lvl:2},
+  {id:"cheat",icon:"🍔",label:"Repas plaisir / resto de ton choix",lvl:3},
 ];
+
 const RP=[
   {id:"p3",icon:"🌸",label:"Pillier de sérénité atteint",lvl:3},
   {id:"p10",icon:"⛩️",label:"Objectif voyage Japon",lvl:10},
   {id:"p20",icon:"🌟",label:"Maîtrise accomplie",lvl:20},
-];
-const CF=[
-  {id:"s1",label:"Scroll impulsif / excessif",debt:1},
-  {id:"s2",label:"Coucher tardif sur écran",debt:1},
-  {id:"s3",label:"Manque de bienveillance envers soi",debt:1},
-];
-const RED=[
-  {id:"r1",icon:"🌬️",label:"Session de respiration profonde x5",r:1},
-  {id:"r2",icon:"🚶",label:"15 min de marche sans téléphone",r:1},
-  {id:"r3",icon:"📖",label:"20 min de lecture calme",r:1},
 ];
 
 const CATS={
@@ -163,12 +148,10 @@ const mkDef=()=>({
   sleepBedtime:null,sleepWake:null,
   epicProgress:{},epicQuests:EQ_DEF,
   debt:0,conscience:[],
-  // Nofap / Maîtrise de soi
   nofapStreak:0,
   nofapBest:0,
   nofapLastReset:TODAY(),
-  unlockedMastery:[0], // Indices des paliers débloqués
-  
+  unlockedMastery:[0],
   eveningDone:false,eveningNote:{good:"",improve:""},
   claimedPalier:[],unlockedBadges:[],newBadges:[],
   gymTotal:0,waterDays:0,sunDays:0,detoxDays:0,
