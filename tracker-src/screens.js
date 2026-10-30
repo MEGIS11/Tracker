@@ -34,7 +34,7 @@ function WeeklyChallengeCard({wc,update,showT}){
   </div>;
 }
 
-// ── DASHBOARD (Accueil sans la bannière Japon) ──
+// ── DASHBOARD (Accueil) ──
 function Dashboard({s,gs,lvl,rank,update,showT,cc}){
   const[eo,setEo]=useState(false);
   const[good,setGood]=useState(s.eveningNote?.good||"");
@@ -90,14 +90,14 @@ function Dashboard({s,gs,lvl,rank,update,showT,cc}){
         {eo&&!s.eveningDone&&<div style={{marginTop:14,display:"flex",flexDirection:"column",gap:10}}>
           <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>Point positif</div><textarea value={good} onChange={e=>setGood(e.target.value)} style={{...tS,height:56}} placeholder="Ce qui s'est bien passé..."/></div>
           <div><div style={{fontSize:11,color:C.sub,marginBottom:4}}>À améliorer</div><textarea value={imp} onChange={e=>setImp(e.target.value)} style={{...tS,height:56}} placeholder="Pour demain..."/></div>
-          <Btn onClick={save} color={C.green} full>Enregistrer</Btn>
+          <Btn onClick={()=> { update(p=>({...p,eveningDone:true,eveningNote:{good,improve:imp}})); showT("Bilan enregistré ✓",C.green); setEo(false); }} color={C.green} full>Enregistrer</Btn>
         </div>}
       </Crd>
     </div>
   </div>;
 }
 
-// ── HABITS (Avec boutons d'annulation / - pour éviter les missclicks) ──
+// ── HABITS (Habitudes) ──
 function Habits({s,update,showT}){
   const modifyP=(id,delta)=>{
     update(p=>{
@@ -133,9 +133,7 @@ function Habits({s,update,showT}){
     });
   };
 
-  const setSl=(f,v)=>update(p=>{
-    const nb={...p,[f]:v};return nb;
-  });
+  const setSl=(f,v)=>update(p=>({...p,[f]:v}));
 
   return<div className="zen-grid-2col">
     {CORE.map((h)=>{
@@ -169,7 +167,7 @@ function Habits({s,update,showT}){
   </div>;
 }
 
-// ── EPIC (Quêtes à long terme) ──
+// ── EPIC (Quêtes épiques) ──
 function Epic({s,update,showT}){
   const setM=(qid,idx)=>update(p=>{
     const q=p.epicQuests.find(x=>x.id===qid);if(!q||(p.epicProgress?.[qid]||0)>idx)return p;
@@ -201,7 +199,7 @@ function Epic({s,update,showT}){
   </div>;
 }
 
-// ── PROFIL (Avec Badges & Courbes d'évolution) ──
+// ── PROFIL (Badges & Courbes) ──
 function Profile({s,lvl,rank}){
   const history=s.history||[];
   
@@ -211,169 +209,4 @@ function Profile({s,lvl,rank}){
         <div>
           <div style={{fontSize:10,color:C.sub,letterSpacing:2,textTransform:"uppercase",fontWeight:800}}>Profil Personnel</div>
           <div style={{fontSize:26,fontWeight:900,color:C.text,marginTop:4}}>Niveau {lvl.lvl}</div>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}><span style={{fontSize:18}}>{rank.icon}</span><span style={{fontSize:13,fontWeight:700,color:rank.color}}>{rank.name}</span></div>
-        </div>
-        <div style={{textAlign:"right"}}><div style={{fontSize:22,fontWeight:900,color:C.roseDeep}><CountUp value={s.xp}/></div><div style={{fontSize:10,color:C.sub}}>XP total</div></div>
-      </div>
-      <div style={{marginTop:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub,marginBottom:4}}><span>Progression</span><span>{Math.round(lvl.rem)}/{lvl.needed} XP</span></div>
-        <SegBar pct={lvl.pct} color={C.rose} segments={20} h={8}/>
-      </div>
-    </div>
-
-    {/* Courbe / Historique des scores récents */}
-    <Crd>
-      <Lbl>📈 ÉVOLUTION DE LA SÉRÉNITÉ (90 DERNIERS JOURS)</Lbl>
-      {history.length===0?<div style={{fontSize:12,color:C.sub,marginTop:10}}>Pas encore assez d'historique. Continue tes journées pour voir la courbe se dessiner !</div>:
-      <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
-        <div style={{display:"flex",alignItems:"flex-end",height:100,gap:4,borderBottom:`1px solid ${C.border}`,paddingBottom:4}}>
-          {history.map((h,i)=>{
-            const sc=h.score||0;
-            return<div key={i} title={`${h.date}: ${sc}%`} style={{flex:1,background:getScoreColor(sc),height:`${Math.max(4,sc)}%`,borderRadius:4,transition:"height .3s"}}/>;
-          })}
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:C.sub}}>
-          <span>{history[0]?.date}</span>
-          <span>Aujourd'hui</span>
-        </div>
-      </div>}
-    </Crd>
-
-    {/* Section Badges */}
-    <Crd>
-      <Lbl>🏆 BADGES DÉBLOQUÉS</Lbl>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginTop:12}}>
-        {BADGES.map(b=>{
-          const unlocked=(s.unlockedBadges||[]).includes(b.id);
-          return<div key={b.id} style={{background:unlocked?C.surface:C.card,border:`1.5px solid ${unlocked?C.border:C.muted}`,borderRadius:14,padding:12,opacity:unlocked?1:0.4}}>
-            <div style={{fontSize:24}}>{b.icon}</div>
-            <div style={{fontSize:13,fontWeight:700,marginTop:6,color:unlocked?C.text:C.sub}}>{b.name}</div>
-            <div style={{fontSize:11,color:C.sub,marginTop:2}}>{b.desc}</div>
-          </div>;
-        })}
-      </div>
-    </Crd>
-  </div>;
-}
-
-// ── REWARDS (Plaisirs réels) ──
-function Rewards({s,lvl,cc}){
-  return<div style={{display:"flex",flexDirection:"column",gap:14}}>
-    <Crd>
-      <Lbl>RÉCOMPENSES & PLAISIRS</Lbl>
-      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:12}}>Débloque et profite de tes récompenses bien méritées.</div>
-      {RD.map(r=>{
-        const ok=lvl.lvl>=(r.lvl||1);
-        return<div key={r.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:`1px solid ${C.border}`,opacity:ok?1:0.5}}>
-          <span style={{fontSize:24}}>{r.icon}</span>
-          <div>
-            <div style={{fontSize:14,fontWeight:600}}>{r.label}</div>
-            <div style={{fontSize:11,color:C.sub}}>{r.lvl?`Niveau ${r.lvl} requis`:"Disponible"}</div>
-          </div>
-          {ok&&<span style={{marginLeft:"auto",color:C.green,fontSize:12,fontWeight:700}}>Débloqué ✓</span>}
-        </div>;
-      })}
-    </Crd>
-  </div>;
-}
-
-// ── CONSCIENCE & MAÎTRISE DE SOI ──
-function Conscience({s,update,showT}){
-  const streak=s.nofapStreak||0;
-  const best=s.nofapBest||0;
-  const unlocked=s.unlockedMastery||[0];
-
-  const resetStreak=()=>{
-    const current=s.nofapStreak||0;
-    if(current>best) update(p=>({...p,nofapBest:current,nofapStreak:0,nofapLastReset:TODAY()}));
-    else update(p=>({...p,nofapStreak:0,nofapLastReset:TODAY()}));
-    showT("Le compteur a redémarré. Chaque pas est un apprentissage.",C.rose);
-  };
-
-  const incrementDay=()=>update(p=>{
-    const next=(p.nofapStreak||0)+1;
-    const newBest=Math.max(next,p.nofapBest||0);
-    let addedXp=0;
-    const newUnlocked=[...(p.unlockedMastery||[0])];
-
-    MASTERY_MILESTONES.forEach((m,idx)=>{
-      if(next>=m.days&&!newUnlocked.includes(idx+1)){
-        newUnlocked.push(idx+1);
-        addedXp+=m.xp;
-        setTimeout(()=>showT(`🪷 Palier débloqué : ${m.title} (+${m.xp}XP) !`,C.gold,4000),500);
-      }
-    });
-
-    return{...p,nofapStreak:next,nofapBest:newBest,xp:p.xp+addedXp,unlockedMastery:newUnlocked};
-  });
-
-  return<div style={{display:"flex",flexDirection:"column",gap:16}}>
-    <Crd style={{background:`linear-gradient(135deg, ${C.surface}, ${C.card})`,border:`1.5px solid ${C.rosePale}`}}>
-      <Lbl>🪷 MAÎTRISE DE SOI & CLARTÉ</Lbl>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:14}}>
-        <div>
-          <div style={{fontSize:42,fontWeight:900,color:C.roseDeep,lineHeight:1}}><CountUp value={streak}/> <span style={{fontSize:18,fontWeight:600}}>jours</span></div>
-          <div style={{fontSize:12,color:C.sub,marginTop:4}}>Record personnel : {best} jours</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          <Btn onClick={incrementDay} color={C.green} small>+1 Jour</Btn>
-          <button onClick={resetStreak} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:12,padding:"6px 10px",color:C.sub,fontSize:11,cursor:"pointer",fontWeight:600}}>Recommencer</button>
-        </div>
-      </div>
-    </Crd>
-
-    <Crd>
-      <Lbl>✨ TITRES & PALIERS MYSTÈRES</Lbl>
-      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:14}}>Continue ton chemin pour révéler les secrets de la maîtrise.</div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {MASTERY_MILESTONES.map((m,idx)=>{
-          const isUnlocked=unlocked.includes(idx+1);
-          return<div key={idx} style={{
-            background:isUnlocked?C.surface:C.card,
-            border:`1.5px solid ${isUnlocked?C.border:"#eee"}`,
-            borderRadius:14,padding:"12px 14px",
-            display:"flex",justifyContent:"space-between",alignItems:"center",
-            opacity:isUnlocked?1:0.75
-          }}>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:isUnlocked?C.text:C.sub}}>
-                {isUnlocked?m.title:"🔒 ??????????? ("+m.days+" jours)"}
-              </div>
-              <div style={{fontSize:11,color:C.sub,marginTop:2}}>
-                {isUnlocked?m.desc:"Atteins ce palier pour révéler ce titre et gagner "+m.xp+" XP."}
-              </div>
-            </div>
-            <div style={{fontSize:12,fontWeight:800,color:isUnlocked?C.green:C.sub}}>
-              {isUnlocked?"✓ Débloqué":m.days+"j"}
-            </div>
-          </div>;
-        })}
-      </div>
-    </Crd>
-  </div>;
-}
-
-// ── SETTINGS ──
-function Settings({s,update,showT}){
-  const fileInputRef=useRef(null);
-  const rd=()=>{update(p=>({...p,coreProgress:{},sleepBedtime:null,sleepWake:null,eveningDone:false,eveningNote:{good:"",improve:""},todayKey:TODAY()}));showT("Journée réinitialisée",C.sub);};
-  const exportData=()=>{try{const dataStr=JSON.stringify(s,null,2);const blob=new Blob([dataStr],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`zen-tracker-backup-${TODAY()}.json`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);showT("💾 Sauvegarde exportée !",C.green);}catch(e){showT("Erreur",C.rose);}};
-  const triggerImport=()=>fileInputRef.current?.click();
-  const handleImportFile=(e)=>{const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();reader.onload=(ev)=>{try{const parsed=JSON.parse(ev.target.result);update(()=>({...mkDef(),...parsed}));showT("✅ Restauré !",C.green,3000);}catch(err){showT("Fichier invalide",C.rose);}};reader.readAsText(file);e.target.value="";};
-
-  return<div style={{display:"flex",flexDirection:"column",gap:16}}>
-    <Crd>
-      <Lbl>💾 SAUVEGARDE</Lbl>
-      <div style={{fontSize:12,color:C.sub,marginTop:6,marginBottom:12,lineHeight:1.5}}>Tes données sont sauvegardées sur cet appareil. Pense à exporter régulièrement.</div>
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        <Btn onClick={exportData} color={C.blue} full>⬇️ Exporter les données</Btn>
-        <Btn onClick={triggerImport} color={C.purple} full>⬆️ Importer une sauvegarde</Btn>
-        <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={handleImportFile} style={{display:"none"}}/>
-      </div>
-    </Crd>
-    <Crd>
-      <Lbl>RÉINITIALISATION</Lbl>
-      <div style={{marginTop:12}}><Btn onClick={rd} color={C.amber} full>Remettre la journée à zéro</Btn></div>
-    </Crd>
-  </div>;
-}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}><span style={{
